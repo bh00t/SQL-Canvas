@@ -1177,6 +1177,7 @@
         ══════════════════════════════════════════════════════════════════════ */
         function App() {
             const [inputText,    setInputText]    = useState('');
+            const inputTextRef = useRef('');
             const [outputText,   setOutputText]   = useState('');
             const [fileName,     setFileName]     = useState('script.sql');
             const [isProcessing, setIsProcessing] = useState(false);
@@ -1322,8 +1323,8 @@
                 setMode(newMode);
                 setShowReport(false);
                 
-                if (inputText.trim()) {
-                    processText(inputText, newMode);
+                if (inputTextRef.current.trim()) {
+                    processText(inputTextRef.current, newMode);
                 } else {
                     setOutputText('');
                     setStats(null);
@@ -1337,7 +1338,7 @@
                 const r = new FileReader();
                 r.onload = ev => {
                     const text = ev.target.result;
-                    setInputText(text);
+                    inputTextRef.current = text; setInputText(text);
                     setOutputText('');
                     setStats(null);
                     // Auto-process immediately
@@ -1373,7 +1374,7 @@
                 URL.revokeObjectURL(url);
             }
 
-            function handleClear() { setInputText(''); setOutputText(''); setStats(null); setError(null); }
+            function handleClear() { reqIdRef.current++; inputTextRef.current = ''; setInputText(''); setOutputText(''); setStats(null); setError(null); setIsProcessing(false); }
 
             const inputLines = inputText ? inputText.split('\n').length : 0;
 
@@ -1442,7 +1443,7 @@
                                 const r = new FileReader();
                                 r.onload = ev => {
                                     const text = ev.target.result;
-                                    setInputText(text); setOutputText(''); setStats(null);
+                                    inputTextRef.current = text; setInputText(text); setOutputText(''); setStats(null);
                                     setTimeout(() => processText(text), 50);
                                 };
                                 r.readAsText(file);
@@ -1491,7 +1492,7 @@
                             <div className="flex-1 overflow-hidden min-h-0">
                                 <textarea
                                     value={inputText}
-                                    onChange={e=>setInputText(e.target.value)}
+                                    onChange={e=>{ inputTextRef.current = e.target.value; setInputText(e.target.value); }}
                                     placeholder={"-- Paste your SQL script here…\n-- Or drag & drop a .sql file onto this panel\n-- Press Ctrl+Enter (⌘↵) to minify or beautify"}
                                     className="w-full h-full resize-none p-4 focus:outline-none font-fira text-sm leading-relaxed text-slate-800 dark:text-slate-300 bg-transparent placeholder-slate-400 dark:placeholder-slate-600"
                                     spellCheck="false"
