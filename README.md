@@ -8,7 +8,7 @@
 
 ## Live Demo
 
-Try it out instantly: **[Live Demo Link ]**
+Try it out instantly: **[[Live Demo Link](https://bh00t.github.io/SQL-Canvas/) ]**
 
 ---
 
@@ -43,7 +43,7 @@ Try it out instantly: **[Live Demo Link ]**
 ## How to Use
 
 1. **Input your SQL**  
-   - Open the application in your browser.  
+   - Open [Live Website](https://bh00t.github.io/SQL-Canvas/) or open your local `index.html`.  
    - Paste raw SQL into the left editor or drag-and-drop a `.sql` file.
 
 2. **Choose your Mode**  
