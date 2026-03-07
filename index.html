@@ -1182,7 +1182,7 @@
             const [isProcessing, setIsProcessing] = useState(false);
             const [copied,       setCopied]       = useState(false);
             const [stats,        setStats]        = useState(null);
-            const [autoAlias,    setAutoAlias]    = useState(false);
+            const [autoAlias,    setAutoAlias]    = useState(true);
             const [removeNL,     setRemoveNL]     = useState(false);
             const [isDark,       setIsDark]       = useState(false);
             const [error,        setError]        = useState(null);
@@ -1243,43 +1243,74 @@
                 }
             }, [autoAlias, removeNL]);
 
+            const workerRef  = useRef(null);
+            const reqIdRef   = useRef(0);
+
+            function getWorker() {
+                if (workerRef.current) return workerRef.current;
+                const src = [
+                    astMinifyEngine.toString(),
+                    sqlBeautify.toString(),
+                    `self.onmessage = function(e) {
+                        var d = e.data, text = d.text, mode = d.mode, autoAlias = d.autoAlias, removeNL = d.removeNL, reqId = d.reqId;
+                        try {
+                            if (mode === 'beautify') {
+                                var out = sqlBeautify(text);
+                                self.postMessage({ out: out, mode: mode, reqId: reqId });
+                            } else {
+                                var slc  = (text.match(/--[^\\n]*/g)||[]).length;
+                                var mlc  = (text.match(/\\/\\*[\\s\\S]*?\\*\\//g)||[]).length;
+                                var oLns = text.split('\\n').filter(function(l){return l.trim()!=='';}).length;
+                                var oChr = text.length;
+                                var out  = astMinifyEngine(text, autoAlias);
+                                if (removeNL) out = out.replace(/\\n+/g,' ').replace(/  +/g,' ').trim();
+                                var mLns = out.split('\\n').filter(function(l){return l.trim()!=='';}).length;
+                                var mChr = out.length;
+                                var oSz  = new Blob([text]).size;
+                                var mSz  = new Blob([out]).size;
+                                self.postMessage({ out: out, mode: mode, reqId: reqId, stats: {
+                                    originalSize:oSz, minifiedSize:mSz, originalChars:oChr, minifiedChars:mChr,
+                                    originalLines:oLns, minifiedLines:mLns, singleLineComments:slc, multiLineComments:mlc,
+                                    totalComments:slc+mlc,
+                                    reduction:(((oSz-mSz)/oSz)*100).toFixed(1),
+                                    charReduction:(((oChr-mChr)/oChr)*100).toFixed(1),
+                                    lineReduction:(((oLns-mLns)/oLns)*100).toFixed(1)
+                                }});
+                            }
+                        } catch(err) {
+                            self.postMessage({ error: err.message || 'Unexpected error during processing.', reqId: reqId });
+                        }
+                    };`
+                ].join('\n');
+                var blob = new Blob([src], { type: 'application/javascript' });
+                var worker = new Worker(URL.createObjectURL(blob));
+                worker.onmessage = (e) => {
+                    const { out, stats: s, error: err, reqId, mode: resMode } = e.data;
+                    if (reqId !== reqIdRef.current) return;
+                    if (err) {
+                        setError(err);
+                    } else {
+                        setOutputText(out);
+                        if (resMode === 'minify' && s) setStats(s);
+                    }
+                    setIsProcessing(false);
+                };
+                worker.onerror = (e) => {
+                    setError(e.message || 'Unexpected error during processing.');
+                    setIsProcessing(false);
+                };
+                workerRef.current = worker;
+                return worker;
+            }
+
+            useEffect(() => { getWorker(); }, []);
+
             function processText(text, currentMode) {
                 if (!text) return;
                 const m = currentMode || mode;
                 setIsProcessing(true); setStats(null); setError(null);
-                setTimeout(() => {
-                    try {
-                        if (m === 'beautify') {
-                            const out = sqlBeautify(text);
-                            setOutputText(out);
-                        } else {
-                            const slc  = (text.match(/--[^\n]*/g)||[]).length;
-                            const mlc  = (text.match(/\/\*[\s\S]*?\*\//g)||[]).length;
-                            const oLns = text.split('\n').filter(l => l.trim() !== '').length;
-                            const oChr = text.length;
-                            let out    = astMinifyEngine(text, autoAlias);
-                            if (removeNL) out = out.replace(/\n+/g,' ').replace(/  +/g,' ').trim();
-                            const mLns = out.split('\n').filter(l => l.trim() !== '').length;
-                            const mChr = out.length;
-                            const oSz  = new Blob([text]).size;
-                            const mSz  = new Blob([out]).size;
-                            setOutputText(out);
-                            setStats({
-                                originalSize:oSz, minifiedSize:mSz, originalChars:oChr, minifiedChars:mChr,
-                                originalLines:oLns, minifiedLines:mLns, singleLineComments:slc, multiLineComments:mlc,
-                                totalComments:slc+mlc,
-                                reduction:    (((oSz-mSz)/oSz)*100).toFixed(1),
-                                charReduction:(((oChr-mChr)/oChr)*100).toFixed(1),
-                                lineReduction:(((oLns-mLns)/oLns)*100).toFixed(1),
-                            });
-                        }
-                    } catch(err) {
-                        console.error(err);
-                        setError(err.message || 'Unexpected error during processing.');
-                    } finally {
-                        setIsProcessing(false);
-                    }
-                }, 50);
+                const reqId = ++reqIdRef.current;
+                getWorker().postMessage({ text, mode: m, autoAlias, removeNL, reqId });
             }
 
             function handleProcess() {
@@ -1367,6 +1398,14 @@
                                 </h1>
                             </div>
                             <div className="flex items-center gap-3">
+                                <Tooltip content="View on GitHub" position="bottom-right">
+                                    <a href="https://github.com/bh00t/SQL-Canvas" target="_blank" rel="noopener noreferrer"
+                                        className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors flex items-center justify-center">
+                                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                            <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                                        </svg>
+                                    </a>
+                                </Tooltip>
                                 <Tooltip content={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'} position="bottom-right">
                                     <button onClick={()=>setIsDark(!isDark)}
                                         className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors">
