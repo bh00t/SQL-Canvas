@@ -1,0 +1,1652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SQL | SQL Minifier</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <!-- ESM Import Map -->
+    <script type="importmap">
+        {
+            "imports": {
+                "react":            "https://esm.sh/react@18.2.0",
+                "react-dom":        "https://esm.sh/react-dom@18.2.0",
+                "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+                "lucide-react":     "https://esm.sh/lucide-react@0.263.1"
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; margin: 0; overflow: hidden; }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+        ::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+        .dark ::-webkit-scrollbar-thumb { background-color: #475569; }
+        .dark ::-webkit-scrollbar-thumb:hover { background-color: #64748b; }
+
+        .font-fira { font-family: 'Fira Code', monospace; }
+
+        @keyframes statsReveal {
+            from { opacity: 0; transform: translateY(-4px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .stats-reveal { animation: statsReveal 0.3s ease-out forwards; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .fade-in { animation: fadeIn 0.2s ease-out forwards; }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden bg-white dark:bg-slate-900">
+    <div id="root" class="h-full w-full"></div>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState, useRef, useEffect, useCallback } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import {
+            FileUp, Download, Copy, Trash2, FileCode2, Check, Database,
+            Settings2, Activity, Moon, Sun, Code2, Play, Zap, Lightbulb, Wand2
+        } from 'lucide-react';
+
+        /* ── Tooltip component ── */
+        const Tooltip = ({ content, children, position = 'top', disabled = false }) => {
+          if (disabled || !content) return <>{children}</>;
+          const positions = {
+            top: 'bottom-full left-1/2 -translate-x-1/2 mb-2',
+            bottom: 'top-full left-1/2 -translate-x-1/2 mt-2',
+            left: 'right-full top-1/2 -translate-y-1/2 mr-2',
+            right: 'left-full top-1/2 -translate-y-1/2 ml-2',
+            'bottom-right': 'top-full right-0 mt-2',
+            'bottom-left': 'top-full left-0 mt-2',
+            'top-right': 'bottom-full right-0 mb-2',
+            'top-left': 'bottom-full left-0 mb-2'
+          };
+          return (
+            <div className="group relative inline-flex items-center justify-center">
+              {children}
+              <div className={`absolute ${positions[position]} px-2 py-1 bg-slate-900/75 dark:bg-slate-100/75 backdrop-blur-sm text-white dark:text-slate-900 text-[10px] md:text-xs font-medium rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-[100] pointer-events-none`}>
+                {content}
+              </div>
+            </div>
+          );
+        };
+
+        /* ── Reactive window width ── */
+        function useWindowWidth() {
+            const [w, setW] = useState(window.innerWidth);
+            useEffect(() => {
+                const h = () => setW(window.innerWidth);
+                window.addEventListener('resize', h);
+                return () => window.removeEventListener('resize', h);
+            }, []);
+            return w;
+        }
+
+        /* ── Format bytes ── */
+        function formatBytes(bytes) {
+            if (!bytes || bytes === 0) return '0 B';
+            const k = 1024, s = ['B','KB','MB','GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + s[i];
+        }
+
+        /* ══════════════════════════════════════════════════════════════════════
+           TWO-PASS AST-DRIVEN SQL MINIFICATION ENGINE
+        ══════════════════════════════════════════════════════════════════════ */
+        function astMinifyEngine(sql, enableAutoAlias) {
+            if (!sql.trim()) return '';
+
+            // Phase 1: Lexical Tokenisation
+            let tokens = [], i = 0;
+            const isWC = c => /[a-zA-Z0-9_$]/.test(c);
+            const isOC = c => /[=<>,\(\)\+\-\*\/\;\|\.\:\!\@\#\%\^\&\~\?\[\]]/.test(c);
+
+            while (i < sql.length) {
+                const ch = sql[i];
+
+                if (ch === "'") {
+                    let s = ch; i++;
+                    while (i < sql.length) {
+                        s += sql[i];
+                        if (sql[i] === "'" && sql[i+1] === "'") { s += "'"; i+=2; continue; }
+                        if (sql[i] === "'") { i++; break; }
+                        i++;
+                    }
+                    tokens.push({ type:'string', val:s }); continue;
+                }
+                if (ch === '"') {
+                    let s = ch; i++;
+                    while (i < sql.length) { s += sql[i]; if (sql[i]==='"'){i++;break;} i++; }
+                    tokens.push({ type:'word', val:s }); continue;
+                }
+                if (ch === '`') {
+                    let s = ch; i++;
+                    while (i < sql.length) { s += sql[i]; if (sql[i]==='`'){i++;break;} i++; }
+                    tokens.push({ type:'word', val:s }); continue;
+                }
+                if (ch==='-' && sql[i+1]==='-') {
+                    i+=2;
+                    while (i<sql.length && sql[i]!=='\n' && sql[i]!=='\r') i++;
+                    if (i<sql.length && sql[i]==='\r') i++;
+                    if (i<sql.length && sql[i]==='\n') i++;
+                    continue;
+                }
+                if (ch==='/' && sql[i+1]==='*') {
+                    i+=2;
+                    while (i<sql.length){ if(sql[i]==='*'&&sql[i+1]==='/'){i+=2;break;} i++; }
+                    continue;
+                }
+                if (/\s/.test(ch)) {
+                    let ws=ch; i++;
+                    while (i<sql.length && /\s/.test(sql[i])) { ws+=sql[i]; i++; }
+                    tokens.push({ type: (ws.includes('\n')||ws.includes('\r')) ? 'newline' : 'space', val:'\n' });
+                    continue;
+                }
+                if (isOC(ch)) { tokens.push({type:'operator',val:ch}); i++; continue; }
+                if (isWC(ch)) {
+                    let w=ch; i++;
+                    while (i<sql.length && isWC(sql[i])) { w+=sql[i]; i++; }
+                    tokens.push({type:'word',val:w}); continue;
+                }
+                tokens.push({type:'unknown',val:ch}); i++;
+            }
+
+            // Phase 1.5: Compound identifiers
+            let merged = [];
+            for (let j=0; j<tokens.length; j++) {
+                const t = tokens[j];
+                if (t.type==='word') {
+                    let c=t.val, la=j+1;
+                    while(tokens[la]&&tokens[la].type==='space') la++;
+                    if(tokens[la]&&tokens[la].val==='.') {
+                        la++;
+                        while(tokens[la]&&tokens[la].type==='space') la++;
+                        if(tokens[la]&&(tokens[la].type==='word'||tokens[la].val==='*')){
+                            c+='.'+tokens[la].val; j=la;
+                            let nl=la+1;
+                            while(tokens[nl]&&tokens[nl].type==='space') nl++;
+                            if(tokens[nl]&&tokens[nl].val==='.'){
+                                nl++;
+                                while(tokens[nl]&&tokens[nl].type==='space') nl++;
+                                if(tokens[nl]&&(tokens[nl].type==='word'||tokens[nl].val==='*')){
+                                    c+='.'+tokens[nl].val; j=nl;
+                                }
+                            }
+                            merged.push({type:'word',val:c}); continue;
+                        }
+                    }
+                }
+                merged.push(t);
+            }
+            tokens = merged;
+
+            // Phase 1.8: Split into statements
+            const stmts=[], cur=[];
+            for (const t of tokens) {
+                cur.push(t);
+                if(t.type==='operator'&&t.val===';'){stmts.push([...cur]);cur.length=0;}
+            }
+            if(cur.length) stmts.push(cur);
+
+            const KW = new Set([
+                'select','from','where','join','inner','left','right','full','cross','on','group','by','order',
+                'having','limit','and','or','in','is','not','null','as','update','insert','into','values','set',
+                'delete','truncate','merge','when','then','else','end','case','with','declare','begin','exception',
+                'commit','rollback','create','replace','procedure','function','table','view','materialized',
+                'boolean','int','varchar','timestamp','date','time','count','sum','max','min','avg','isnull',
+                'coalesce','getdate','sysdate','dateadd','returning','extract','epoch','cast','over','partition',
+                'rows','between','unbounded','preceding','current','row','exists','drop','alter','call','raise',
+                'notice','if','elsif','loop','while','record','type','default','nullif','lag','lead','float','numeric'
+            ]);
+            const CT = new Set([
+                'where','on','group','order','having','limit','select','insert','update','delete','truncate','merge',
+                'set','values','declare','begin','exception','commit','rollback','returning','with','create','drop',
+                'alter','if','elsif','loop','while','call','raise'
+            ]);
+            const isFuncFrom = (stmt, idx) => {
+                for (let k=idx-1; k>=0; k--)
+                    if(stmt[k].type==='word') return ['epoch','extract','substring','trim'].includes(stmt[k].val.toLowerCase());
+                return false;
+            };
+
+            let result='', prevType=null;
+
+            for (const stmt of stmts) {
+                const dmlT={}, tAliases={}, genA=new Set();
+                const dmlTargets = new Set();
+
+                // Pass A: alias pre-computation
+                {
+                    let ps='NORMAL', pFrom=false, pExp=false, pD=0;
+                    const cands=[];
+                    for (let j=0; j<stmt.length; j++) {
+                        const t=stmt[j];
+                        if(t.type==='operator'){
+                            if(t.val==='('){pD++;pExp=false;}
+                            else if(t.val===')'){if(pD>0)pD--;}
+                            else if(t.val===';'){pFrom=false;pExp=false;}
+                            else if(t.val===','&&pFrom)pExp=true;
+                            continue;
+                        }
+                        if(t.type!=='word') continue;
+                        const lw=t.val.toLowerCase(), cl=lw.replace(/["`]/g,'');
+                        if(['update','delete','insert','truncate','merge'].includes(lw)){ps='EXPECT_TARGET';}
+                        else if(ps==='EXPECT_TARGET'){
+                            if(!['into','from','table','overwrite','only'].includes(lw)){
+                                dmlTargets.add(cl);
+                                const dp=cl.split('.'); if(dp.length>1)dmlTargets.add(dp[dp.length-1]);
+                                ps='NORMAL';
+                            }
+                        }
+                        if(['from','join'].includes(lw)){
+                            if(lw==='from'&&isFuncFrom(stmt,j)){}
+                            else{pFrom=true;pExp=true;}
+                        } else if(CT.has(lw)){pFrom=false;pExp=false;}
+                        else if(lw==='as'){pExp=false;}
+                        else if(pExp&&!KW.has(lw)){
+                            pExp=false;
+                            let ni=j+1;
+                            while(stmt[ni]&&(stmt[ni].type==='space'||stmt[ni].type==='newline'))ni++;
+                            const nt=stmt[ni], nw=nt?.val?.toLowerCase()||'';
+                            const nIA=nt?.type==='word'&&!KW.has(nw), isF=nt?.val==='(';
+                            const parts=cl.split('.'), base=parts[parts.length-1];
+                            if(nIA){tAliases[cl]=nw; if(parts.length>1)tAliases[base]=nw; j=ni;}
+                            else if(nw==='as'){
+                                let ai=ni+1;
+                                while(stmt[ai]&&(stmt[ai].type==='space'||stmt[ai].type==='newline'))ai++;
+                                const act=stmt[ai]?.val?.toLowerCase();
+                                if(act&&stmt[ai]?.type==='word'&&!KW.has(act)){
+                                    tAliases[cl]=act; if(parts.length>1)tAliases[base]=act; j=ai;
+                                }
+                            } else if(enableAutoAlias&&cl.length>2&&!isF&&!dmlTargets.has(cl)&&!tAliases[cl]){
+                                if(!cands.some(c=>c.cl===cl))cands.push({cl,base,parts});
+                            }
+                        }
+                    }
+                    if(enableAutoAlias&&cands.length>0){
+                        const taken=new Set(Object.values(tAliases));
+                        const isTk=a=>!a||KW.has(a)||taken.has(a)||a.length>3;
+                        const commit=(tk,bk,alias,hd)=>{tAliases[tk]=alias;if(hd)tAliases[bk]=alias;genA.add(alias);taken.add(alias);};
+                        for(const{cl,base,parts}of cands){
+                            if(tAliases[cl])continue;
+                            const np=base.split('_').filter(Boolean);
+                            let alias=null;
+                            if(!alias){const c=base[0].toLowerCase();if(!isTk(c))alias=c;}
+                            if(!alias&&np.length>1){const c=np.map(p=>p[0]).join('').toLowerCase().slice(0,3);if(!isTk(c))alias=c;}
+                            if(!alias&&base.length>=2){const c=base.slice(0,2).toLowerCase();if(!isTk(c))alias=c;}
+                            if(!alias&&base.length>=3){const c=base.slice(0,3).toLowerCase();if(!isTk(c))alias=c;}
+                            if(!alias){const bc=base[0].toLowerCase();for(let n=1;n<=99;n++){const c=bc+n;if(!isTk(c)){alias=c;break;}}}
+                            if(!alias){for(let n=1;n<=99;n++){const c='t'+n;if(!isTk(c)){alias=c;break;}}}
+                            if(alias)commit(cl,base,alias,parts.length>1);
+                        }
+                    }
+                }
+
+                // Pass B: transform + minify
+                let fClause=false, expT=false, dmlSt='NORMAL', dep=0;
+                for(let j=0; j<stmt.length; j++){
+                    const t=stmt[j];
+                    if(t.type==='space'||t.type==='newline'){
+                        const nx=stmt[j+1], pv=stmt[j-1];
+                        const isOp=(tok,cs)=>tok&&tok.type==='operator'&&cs.includes(tok.val);
+                        const DN=['=',',',';','.','<','>','!',':','*','/','|','&',')'];
+                        const DP=['=',',',';','.','<','>','!',':','*','/','|','&','('];
+                        if(isOp(nx,DN)||isOp(pv,DP))continue;
+                        if(t.type==='newline'){if(result.endsWith(' '))result=result.slice(0,-1);if(!result.endsWith('\n'))result+='\n';prevType='newline';}
+                        else{if(prevType&&prevType!=='space'&&prevType!=='newline')result+=' ';prevType='space';}
+                        continue;
+                    }
+                    let val=t.val;
+                    if(t.type==='operator'){
+                        if(t.val==='('){dep++;expT=false;}
+                        else if(t.val===')'){if(dep>0)dep--;}
+                        else if(t.val===';'){fClause=false;expT=false;}
+                        else if(t.val===','&&fClause)expT=true;
+                    }
+                    if(t.type==='word'){
+                        const lw=val.toLowerCase(), cl=lw.replace(/["`]/g,'');
+                        if(['update','delete','insert','truncate','merge'].includes(lw)){dmlSt='EXPECT_TARGET';}
+                        else if(dmlSt==='EXPECT_TARGET'){
+                            if(!['into','from','table','overwrite','only'].includes(lw)){
+                                dmlSt='NORMAL'; result+=lw; prevType=t.type; continue;
+                            }
+                        }
+                        if(['from','join'].includes(lw)){
+                            if(lw==='from'&&isFuncFrom(stmt,j)){}
+                            else{fClause=true;expT=true;}
+                        } else if(CT.has(lw)){fClause=false;expT=false;}
+                        else if(lw==='as'){expT=false;}
+                        else if(expT&&!KW.has(lw)){
+                            expT=false;
+                            let ni=j+1;
+                            while(stmt[ni]&&(stmt[ni].type==='space'||stmt[ni].type==='newline'))ni++;
+                            const nw=stmt[ni]?.val?.toLowerCase()||'';
+                            const nIA=stmt[ni]?.type==='word'&&!KW.has(nw);
+                            if(nIA||nw==='as'){val=lw;}
+                            else if(enableAutoAlias&&tAliases[cl]&&genA.has(tAliases[cl])){val=`${lw} ${tAliases[cl]}`;}
+                            else{val=lw;}
+                            result+=val; prevType=t.type; continue;
+                        }
+                        if(KW.has(lw)){val=lw;}
+                        else{
+                            const sk=Object.keys(tAliases).sort((a,b)=>b.length-a.length);
+                            const ma=sk.find(k=>cl.startsWith(k+'.'));
+                            val=ma?tAliases[ma]+cl.slice(ma.length):lw;
+                        }
+                    }
+                    result+=val; prevType=t.type;
+                }
+            }
+            return result.trim();
+        }
+
+        /* ══════════════════════════════════════════════════════════════════════
+           SQL BEAUTIFIER ENGINE  v3  — smart indent, all edge-case fixes
+        ══════════════════════════════════════════════════════════════════════ */
+        function sqlBeautify(sql) {
+            if (!sql || !sql.trim()) return '';
+            const IND = '    '; // 4-space indent unit
+
+            // ── Step 0: Pre-normalize raw input ──────────────────────────
+            // Fix `| |` → `||` (spaces inside concat operator in source)
+            sql = sql.replace(/\|\s+\|/g, '||');
+            // Fix `: =` → `:=` (spaces inside assignment operator in source)
+            sql = sql.replace(/:\s*=/g, ':=');
+            // Fix `:: ` type cast with space → `::` (col:: TEXT → col::TEXT)
+            sql = sql.replace(/::\s+/g, '::');
+
+            // ── Step 1: Tokenise ──────────────────────────────────────────
+            // Types: STRING | IDENT (quoted) | COMMENT_LINE | COMMENT_BLOCK | WORD | OP | WS
+            const toks = [];
+            let i = 0;
+            while (i < sql.length) {
+                const ch = sql[i];
+                // single-quoted string  'abc' / 'it''s'
+                if (ch === "'") {
+                    let s = "'"; i++;
+                    while (i < sql.length) {
+                        if (sql[i] === "'" && sql[i+1] === "'") { s += "''"; i += 2; }
+                        else if (sql[i] === "'") { s += "'"; i++; break; }
+                        else s += sql[i++];
+                    }
+                    toks.push({k:'STRING', v:s}); continue;
+                }
+                // double-quoted identifier
+                if (ch === '"') {
+                    let s = '"'; i++;
+                    while (i < sql.length) { s += sql[i]; if (sql[i++] === '"') break; }
+                    toks.push({k:'IDENT', v:s}); continue;
+                }
+                // backtick identifier
+                if (ch === '`') {
+                    let s = '`'; i++;
+                    while (i < sql.length) { s += sql[i]; if (sql[i++] === '`') break; }
+                    toks.push({k:'IDENT', v:s}); continue;
+                }
+                // block comment
+                if (ch === '/' && sql[i+1] === '*') {
+                    let s = '/*'; i += 2;
+                    while (i < sql.length) {
+                        if (sql[i] === '*' && sql[i+1] === '/') { s += '*/'; i += 2; break; }
+                        s += sql[i++];
+                    }
+                    toks.push({k:'COMMENT_BLOCK', v:s}); continue;
+                }
+                // line comment
+                if (ch === '-' && sql[i+1] === '-') {
+                    let s = '--'; i += 2;
+                    while (i < sql.length && sql[i] !== '\n') s += sql[i++];
+                    toks.push({k:'COMMENT_LINE', v:s}); continue;
+                }
+                // cast operator ::
+                if (ch === ':' && sql[i+1] === ':') {
+                    toks.push({k:'OP', v:'::'}); i += 2; continue;
+                }
+                // PL/pgSQL assignment :=
+                if (ch === ':' && sql[i+1] === '=') {
+                    toks.push({k:'OP', v:':='}); i += 2; continue;
+                }
+                // concat operator ||
+                if (ch === '|' && sql[i+1] === '|') {
+                    toks.push({k:'OP', v:'||'}); i += 2; continue;
+                }
+                // whitespace — collapse entirely (we'll place our own)
+                if (/\s/.test(ch)) { while (i < sql.length && /\s/.test(sql[i])) i++; continue; }
+                // word / keyword / identifier
+                if (/[a-zA-Z_$]/.test(ch)) {
+                    let w = '';
+                    while (i < sql.length && /[a-zA-Z0-9_$]/.test(sql[i])) w += sql[i++];
+                    toks.push({k:'WORD', v:w}); continue;
+                }
+                // number
+                if (/[0-9]/.test(ch)) {
+                    let n = '';
+                    while (i < sql.length && /[0-9._]/.test(sql[i])) n += sql[i++];
+                    toks.push({k:'NUM', v:n}); continue;
+                }
+                // two-char operators
+                if ((ch === '<' || ch === '>' || ch === '!' || ch === '<' || ch === '>') && /[=<>]/.test(sql[i+1])) {
+                    toks.push({k:'OP', v:ch+sql[i+1]}); i += 2; continue;
+                }
+                toks.push({k:'OP', v:ch}); i++;
+            }
+
+            // ── Step 2: resolve multi-word keywords ──────────────────────
+            // Flatten consecutive WORDs (separated only by discarded ws) into phrases
+            // for matching. We use a lookahead matcher instead of pre-merging.
+
+            // keywords that start a new TOP-LEVEL clause (own line, base indent of current depth)
+            const TOP = new Set([
+                'select','from','where','having','limit','offset',
+                'set','values','returning',
+                'union','union all','intersect','except',
+                'begin','end','commit','rollback',
+                'declare','exception','loop','elsif','raise',
+                'nonatomic','language',
+            ]);
+            // JOIN keywords (own line, base indent)
+            const JOINS = new Set([
+                'join','inner join','left join','left outer join',
+                'right join','right outer join','full join','full outer join','cross join',
+                'natural join',
+            ]);
+            // DML / DDL starters (own line, blank line before if not first)
+            const DML = new Set([
+                'select','insert','insert into','update','delete','delete from',
+                'merge','merge into','truncate','truncate table',
+                'create','create table','create temporary table','create temp table',
+                'create or replace','create or replace procedure','create or replace function',
+                'create view','create materialized view',
+                'drop','drop table','drop view','drop table if exists',
+                'alter','alter table',
+                'with',
+                'call',
+            ]);
+            // sub-clause keywords — own line, indented one extra level
+            const SUB = new Set(['and','or']);
+            // CASE control keywords — own line, indented
+            const CASE_KW = new Set(['when','then','else']);
+            // these get their own line at base depth (no extra indent)
+            const CLAUSE_NODENT = new Set(['on','using','where','having','set','returning','nonatomic','language']);
+
+            // Peek helper: from token index idx, read up to `max` consecutive WORD tokens
+            // (skipping nothing — whitespace already dropped). Returns array of lowercased words.
+            const wordAt = (idx) => (toks[idx] && toks[idx].k === 'WORD') ? toks[idx].v.toLowerCase() : null;
+
+            // Try to match a multi-word keyword starting at toks[idx].
+            // Returns { phrase, consume } or null.
+            const matchKw = (idx) => {
+                const w0 = wordAt(idx); if (!w0) return null;
+                const w1 = wordAt(idx+1);
+                const w2 = wordAt(idx+2);
+                const w3 = wordAt(idx+3);
+                // try 4-word
+                const p4 = [w0,w1,w2,w3].filter(Boolean).join(' ');
+                const p3 = [w0,w1,w2].filter(Boolean).join(' ');
+                const p2 = [w0,w1].filter(Boolean).join(' ');
+                const p1 = w0;
+                for (const [p, c] of [[p4,4],[p3,3],[p2,2],[p1,1]]) {
+                    if (!p) continue;
+                    if (TOP.has(p)||JOINS.has(p)||DML.has(p)||SUB.has(p)||CASE_KW.has(p)||CLAUSE_NODENT.has(p)||
+                        p==='group by'||p==='order by'||p==='partition by'||p==='order by'||p==='as'||
+                        p==='insert into'||p==='delete from'||p==='create or replace'||
+                        p==='left join'||p==='right join'||p==='full join'||p==='inner join'||
+                        p==='left outer join'||p==='right outer join'||p==='full outer join'||
+                        p==='cross join'||p==='natural join'||p==='union all'||
+                        p==='drop table if exists'||p==='create temporary table'||p==='create temp table'||
+                        p==='not in'||p==='not like'||p==='not null'||p==='is null'||p==='is not'||p==='is not null'||
+                        p==='over'||p==='between'||p==='case'||p==='end'||p==='if'||p==='then'||p==='else'||
+                        p==='row_number'||p==='group by'||p==='order by') {
+                        return { phrase: p, consume: c };
+                    }
+                }
+                return null;
+            };
+
+            // ── Step 3: Format ────────────────────────────────────────────
+            let out = '';
+            let depth = 0;          // subquery/paren depth → extra indent
+            let col = 0;            // current column position on line
+            // clause context stack — tracks what clause we're inside per depth
+            // 'TOP' | 'SELECT_LIST' | 'FROM' | 'WHERE' | 'CASE' | 'SUBQ' | etc.
+            const ctxStack = ['TOP'];
+            const ctx = () => ctxStack[ctxStack.length-1];
+
+            // Track whether each paren depth is a subquery or just a function call
+            const subqDepths = new Set();
+
+            const nl = (extraInd = 0) => {
+                out = out.trimEnd();
+                out += '\n' + IND.repeat(Math.max(0, depth + extraInd));
+                col = (depth + extraInd) * 4;
+            };
+
+            const sp = () => { if (out.length && !out.endsWith('\n') && !out.endsWith(' ')) { out += ' '; col++; } };
+
+            const write = (s) => { out += s; col += s.length; };
+
+            // No-space-before operators
+            const NSBL = new Set([',','.',';','(',')','::']);
+            // No-space-after operators
+            const NSAR = new Set(['.','(','::']);
+            // operators where space on both sides is nice
+            const SPACED_OPS = new Set(['=','<','>','<=','>=','!=','<>','+','-','*','/','%','||']);
+
+            // Track previous non-ws token for spacing decisions
+            let prevTok = null;
+
+            // We process tokens linearly with lookahead
+            let j = 0;
+            const peek = (off=1) => toks[j+off] || null;
+
+            // Is a paren at index j opening a subquery?
+            const isSubqueryOpen = (idx) => {
+                // look ahead past '(' for first meaningful token
+                for (let k = idx+1; k < toks.length && k < idx+6; k++) {
+                    const t = toks[k];
+                    if (!t || t.k === 'COMMENT_LINE' || t.k === 'COMMENT_BLOCK') continue;
+                    if (t.k === 'WORD') {
+                        const lw = t.v.toLowerCase();
+                        return lw === 'select' || lw === 'with';
+                    }
+                    break;
+                }
+                return false;
+            };
+
+            while (j < toks.length) {
+                const tok = toks[j];
+
+                // ── Comments ──
+                if (tok.k === 'COMMENT_LINE') {
+                    if (out.trimEnd().endsWith('\n') || out === '') { /* already on own line */ }
+                    else nl();
+                    write(tok.v.trimEnd());
+                    nl();
+                    prevTok = tok; j++; continue;
+                }
+                if (tok.k === 'COMMENT_BLOCK') {
+                    nl(); write(tok.v.trim()); nl();
+                    prevTok = tok; j++; continue;
+                }
+
+                // ── Strings / Identifiers — inline ──
+                if (tok.k === 'STRING' || tok.k === 'IDENT') {
+                    if (!out.endsWith(' ') && !out.endsWith('\n') && !out.endsWith('(') && !out.endsWith('.') && !out.endsWith('::') && out !== '') sp();
+                    write(tok.v);
+                    prevTok = tok; j++; continue;
+                }
+
+                // ── Numbers ──
+                if (tok.k === 'NUM') {
+                    if (!out.endsWith(' ') && !out.endsWith('\n') && !out.endsWith('(') && !out.endsWith('::') && out !== '') sp();
+                    write(tok.v);
+                    prevTok = tok; j++; continue;
+                }
+
+                // ── Operators ──
+                if (tok.k === 'OP') {
+                    const v = tok.v;
+
+                    if (v === '(') {
+                        const isSubq = isSubqueryOpen(j);
+                        // no space before '(' if prev was a word (function call) or an ident
+                        if (prevTok && (prevTok.k === 'WORD' || prevTok.k === 'IDENT')) { /* no space */ }
+                        else if (!out.endsWith(' ') && !out.endsWith('\n') && out !== '') sp();
+                        write('(');
+                        depth++;
+                        if (isSubq) {
+                            subqDepths.add(depth);
+                            ctxStack.push('SUBQ');
+                            nl();
+                        } else {
+                            ctxStack.push('PAREN');
+                        }
+                        prevTok = tok; j++; continue;
+                    }
+
+                    if (v === ')') {
+                        const wasSubq = subqDepths.has(depth);
+                        if (wasSubq) {
+                            subqDepths.delete(depth);
+                            nl(-0); // close bracket on its own line at parent depth
+                            // trim the indent we just added back to parent depth
+                            out = out.trimEnd();
+                            out += '\n' + IND.repeat(Math.max(0, depth-1));
+                        }
+                        depth = Math.max(0, depth-1);
+                        if (ctxStack.length > 1) ctxStack.pop();
+                        write(')');
+                        prevTok = tok; j++; continue;
+                    }
+
+                    if (v === ',') {
+                        write(',');
+                        // In SELECT list / column list → newline + indent
+                        // In function args / VALUES → keep inline (but newline if line too long)
+                        const inSubqOrTop = ctx() === 'SUBQ' || ctx() === 'TOP' || ctx() === 'SELECT_LIST';
+                        if (depth === 0 || inSubqOrTop || col > 80) {
+                            nl();
+                        } else {
+                            // function args — single space
+                            sp();
+                        }
+                        prevTok = tok; j++; continue;
+                    }
+
+                    if (v === ';') {
+                        out = out.trimEnd();
+                        write(';');
+                        out += '\n\n';
+                        col = 0;
+                        depth = 0;
+                        subqDepths.clear();
+                        ctxStack.length = 1; ctxStack[0] = 'TOP';
+                        prevTok = tok; j++; continue;
+                    }
+                    if (v === '.') {
+                        write('.'); prevTok = tok; j++; continue;
+                    }
+
+                    if (v === '::') {
+                        write('::'); prevTok = tok; j++; continue;
+                    }
+
+                    // PL/pgSQL assignment operator
+                    if (v === ':=') {
+                        sp(); write(':='); sp(); prevTok = tok; j++; continue;
+                    }
+
+                    // String concatenation
+                    if (v === '||') {
+                        sp(); write('||'); sp(); prevTok = tok; j++; continue;
+                    }
+
+                    // spaced operators
+                    if (SPACED_OPS.has(v)) {
+                        if (!out.endsWith(' ') && !out.endsWith('\n')) sp();
+                        write(v); sp();
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // everything else (!, @, #, ~, etc.)
+                    if (!out.endsWith(' ') && !out.endsWith('\n')) sp();
+                    write(v);
+                    prevTok = tok; j++; continue;
+                }
+
+                // ── WORD tokens — the main logic ──
+                if (tok.k === 'WORD') {
+                    const lw = tok.v.toLowerCase();
+
+                    // ---- CASE expression ----
+                    if (lw === 'case') {
+                        sp(); write('CASE');
+                        depth++;
+                        ctxStack.push('CASE');
+                        prevTok = tok; j++; continue;
+                    }
+                    if (lw === 'end' && ctx() === 'CASE') {
+                        depth = Math.max(0, depth-1);
+                        ctxStack.pop();
+                        nl(); write('END');
+                        prevTok = tok; j++; continue;
+                    }
+                    if ((lw === 'when' || lw === 'then' || lw === 'else') && ctx() === 'CASE') {
+                        nl(); write(lw.toUpperCase()); sp();
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- IF / ELSIF / THEN / ELSE (PL/pgSQL block) ----
+                    if (lw === 'if' && ctx() !== 'CASE') {
+                        nl(); write('IF'); sp();
+                        prevTok = tok; j++; continue;
+                    }
+                    if (lw === 'elsif') {
+                        nl(); write('ELSIF'); sp();
+                        prevTok = tok; j++; continue;
+                    }
+                    if (lw === 'then' && ctx() !== 'CASE') {
+                        sp(); write('THEN'); nl();
+                        prevTok = tok; j++; continue;
+                    }
+                    if (lw === 'else' && ctx() !== 'CASE') {
+                        nl(); write('ELSE'); nl();
+                        prevTok = tok; j++; continue;
+                    }
+                    if (lw === 'end' && ctx() !== 'CASE') {
+                        // end if / end loop
+                        const nextW = wordAt(j+1);
+                        nl(); write('END');
+                        if (nextW === 'if' || nextW === 'loop') { sp(); write(nextW.toUpperCase()); j++; }
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- BEGIN / END block ----
+                    if (lw === 'begin') {
+                        nl(0); write('BEGIN'); depth++; nl();
+                        prevTok = tok; j++; continue;
+                    }
+                    if (lw === 'exception') {
+                        depth = Math.max(0,depth-1); nl(); write('EXCEPTION'); depth++; nl();
+                        prevTok = tok; j++; continue;
+                    }
+                    if (lw === 'declare') {
+                        nl(0); write('DECLARE'); nl();
+                        prevTok = tok; j++; continue;
+                    }
+                    if (lw === 'loop') {
+                        sp(); write('LOOP'); depth++; nl();
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- COMMIT / ROLLBACK / RETURN ----
+                    if (lw === 'commit'||lw === 'rollback'||lw === 'return') {
+                        nl(0); write(lw.toUpperCase());
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- WITH (CTE) ----
+                    if (lw === 'with' && depth === 0) {
+                        if (out.trim()) { out = out.trimEnd(); out += '\n\n'; col = 0; }
+                        write('WITH'); sp();
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- DML starters at depth 0 ----
+                    if (depth === 0) {
+                        // CREATE [OR REPLACE] …
+                        if (lw === 'create') {
+                            if (out.trim()) { out = out.trimEnd(); out += '\n\n'; col = 0; }
+                            // consume optional chain: create or replace procedure/function/table/view…
+                            let phrase = 'CREATE'; j++;
+                            while (j < toks.length && toks[j].k === 'WORD') {
+                                const nw = toks[j].v.toLowerCase();
+                                if (['or','replace','temporary','temp','table','view','materialized',
+                                     'procedure','function','index','schema'].includes(nw)) {
+                                    phrase += ' ' + nw.toUpperCase(); j++;
+                                } else break;
+                            }
+                            write(phrase); sp(); prevTok = tok; continue;
+                        }
+                        if (lw === 'drop') {
+                            if (out.trim()) { out = out.trimEnd(); out += '\n\n'; col = 0; }
+                            let phrase = 'DROP'; j++;
+                            while (j < toks.length && toks[j].k === 'WORD') {
+                                const nw = toks[j].v.toLowerCase();
+                                if (['table','view','index','schema','if','exists'].includes(nw)) {
+                                    phrase += ' ' + nw.toUpperCase(); j++;
+                                } else break;
+                            }
+                            write(phrase); sp(); prevTok = tok; continue;
+                        }
+                        if (lw === 'alter') {
+                            if (out.trim()) { out = out.trimEnd(); out += '\n\n'; col = 0; }
+                            write('ALTER'); sp(); prevTok = tok; j++; continue;
+                        }
+                        if (lw === 'insert') {
+                            if (out.trim()) { out = out.trimEnd(); out += '\n\n'; col = 0; }
+                            write('INSERT'); sp();
+                            const nw = wordAt(j+1);
+                            if (nw === 'into') { write('INTO'); sp(); j += 2; } else j++;
+                            prevTok = tok; continue;
+                        }
+                        if (lw === 'update') {
+                            if (out.trim()) { out = out.trimEnd(); out += '\n\n'; col = 0; }
+                            write('UPDATE'); sp(); prevTok = tok; j++; continue;
+                        }
+                        if (lw === 'delete') {
+                            if (out.trim()) { out = out.trimEnd(); out += '\n\n'; col = 0; }
+                            write('DELETE'); sp();
+                            const nw = wordAt(j+1);
+                            if (nw === 'from') { write('FROM'); sp(); j += 2; } else j++;
+                            prevTok = tok; continue;
+                        }
+                        if (lw === 'truncate') {
+                            if (out.trim()) { out = out.trimEnd(); out += '\n\n'; col = 0; }
+                            write('TRUNCATE'); sp();
+                            const nw = wordAt(j+1);
+                            if (nw === 'table') { write('TABLE'); sp(); j += 2; } else j++;
+                            prevTok = tok; continue;
+                        }
+                        if (lw === 'merge') {
+                            if (out.trim()) { out = out.trimEnd(); out += '\n\n'; col = 0; }
+                            write('MERGE'); sp();
+                            const nw = wordAt(j+1);
+                            if (nw === 'into') { write('INTO'); sp(); j += 2; } else j++;
+                            prevTok = tok; continue;
+                        }
+                        if (lw === 'call') {
+                            if (out.trim()) { out = out.trimEnd(); out += '\n\n'; col = 0; }
+                            write('CALL'); sp(); prevTok = tok; j++; continue;
+                        }
+                    }
+
+                    // ---- SELECT ----
+                    if (lw === 'select') {
+                        if (depth > 0) { nl(); } else { nl(0); }
+                        write('SELECT'); depth++; nl();
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- FROM ----
+                    if (lw === 'from') {
+                        depth = Math.max(0, depth - 1);
+                        nl(0); write('FROM'); nl(1);
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- JOIN variants ----
+                    if (['join','inner','left','right','full','cross','natural'].includes(lw)) {
+                        // try to build full join phrase
+                        let phrase = lw; let k = j+1;
+                        while (k < toks.length && toks[k].k === 'WORD') {
+                            const nw = toks[k].v.toLowerCase();
+                            if (['join','inner','outer','left','right','full','cross','natural'].includes(nw)) {
+                                phrase += ' '+nw; k++;
+                            } else break;
+                        }
+                        if (JOINS.has(phrase) || phrase.includes('join')) {
+                            nl(0); write(phrase.toUpperCase()); nl(1); j = k;
+                        } else {
+                            // not a join keyword after all — write inline
+                            sp(); write(lw); j++;
+                        }
+                        prevTok = tok; continue;
+                    }
+
+                    // ---- ON / USING (join condition) ----
+                    if (lw === 'on' && ctx() !== 'CASE') {
+                        nl(1); write('ON'); sp();
+                        prevTok = tok; j++; continue;
+                    }
+                    if (lw === 'using') {
+                        nl(1); write('USING'); sp();
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- WHERE ----
+                    if (lw === 'where') {
+                        nl(0); write('WHERE'); nl(1);
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- AND / OR (in WHERE / ON / HAVING) at depth 0 or same as clause ----
+                    if ((lw === 'and' || lw === 'or') && ctx() !== 'CASE') {
+                        nl(0); write(lw.toUpperCase()); sp();
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- GROUP BY / ORDER BY / PARTITION BY ----
+                    if (lw === 'group' && wordAt(j+1) === 'by') {
+                        nl(0); write('GROUP BY'); nl(1); j += 2;
+                        prevTok = tok; continue;
+                    }
+                    if (lw === 'order' && wordAt(j+1) === 'by') {
+                        nl(0); write('ORDER BY'); nl(1); j += 2;
+                        prevTok = tok; continue;
+                    }
+                    if (lw === 'partition' && wordAt(j+1) === 'by') {
+                        sp(); write('PARTITION BY'); sp(); j += 2;
+                        prevTok = tok; continue;
+                    }
+
+                    // ---- HAVING ----
+                    if (lw === 'having') {
+                        nl(0); write('HAVING'); nl(1);
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- LIMIT / OFFSET ----
+                    if (lw === 'limit' || lw === 'offset') {
+                        nl(0); write(lw.toUpperCase()); sp();
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- SET (UPDATE … SET  or  SET config_param TO val) ----
+                    if (lw === 'set' && ctx() !== 'CASE') {
+                        // Peek ahead: if next tokens are word = word/string/num (not a column list),
+                        // and depth > 0 (inside a BEGIN block), treat as a config SET → single line
+                        const n1 = wordAt(j+1);
+                        const n2 = toks[j+2];
+                        const isConfigSet = depth > 0 && n1 && n2 &&
+                            (n2.k === 'WORD' && ['to','='].includes(n2.v.toLowerCase()) ||
+                             (toks[j+2] && toks[j+2].v === '='));
+                        if (isConfigSet) {
+                            nl(0); write('SET'); sp();
+                        } else {
+                            nl(0); write('SET'); nl(1);
+                        }
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- VALUES ----
+                    if (lw === 'values') {
+                        nl(0); write('VALUES'); nl(1);
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- RETURNING ----
+                    if (lw === 'returning') {
+                        nl(0); write('RETURNING'); nl(1);
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- UNION / INTERSECT / EXCEPT ----
+                    if (lw === 'union' || lw === 'intersect' || lw === 'except') {
+                        const nw = wordAt(j+1);
+                        out = out.trimEnd(); out += '\n\n';
+                        write(lw.toUpperCase());
+                        if (lw === 'union' && nw === 'all') { sp(); write('ALL'); j++; }
+                        out += '\n'; col = 0;
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- OVER (window function) ----
+                    if (lw === 'over') {
+                        sp(); write('OVER');
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- AS ----
+                    if (lw === 'as') {
+                        sp(); write('AS'); sp();
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- ROWS / RANGE / UNBOUNDED / PRECEDING / FOLLOWING / CURRENT ROW ----
+                    if (['rows','range','unbounded','preceding','following'].includes(lw)) {
+                        sp(); write(lw.toUpperCase());
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- INTO (SELECT … INTO var) ----
+                    if (lw === 'into' && depth === 0) {
+                        nl(1); write('INTO'); sp();
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- NONATOMIC / LANGUAGE (after procedure header) ----
+                    if (lw === 'nonatomic' || lw === 'language') {
+                        nl(0); write(lw.toUpperCase()); sp();
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ---- GET DIAGNOSTICS cnt := row_count ----
+                    if (lw === 'get' && wordAt(j+1) === 'diagnostics') {
+                        nl(0); write('GET DIAGNOSTICS'); sp(); j += 2;
+                        prevTok = tok; continue;
+                    }
+
+                    // ---- generic keywords upper, inline ----
+                    const INLINE_KW = new Set([
+                        'not','null','true','false','asc','desc','distinct','all','in','like','ilike',
+                        'between','exists','any','some','is','by','row','over','filter','within',
+                        'nulls','first','last','recursive','lateral','tablesample','window',
+                        'isnull','notnull','overlaps','similar','to',
+                        'cast','coalesce','nullif','greatest','least','extract','epoch',
+                        'count','sum','avg','min','max',
+                        'now','getdate','sysdate','dateadd','datediff','datepart',
+                        'trim','btrim','lower','upper','length','substr','substring','replace',
+                        'nvl','nvl2','decode','lpad','rpad','concat','split_part',
+                        'row_number','rank','dense_rank','lag','lead','ntile',
+                        'first_value','last_value','percent_rank','cume_dist',
+                        'md5','sha','convert','try_cast',
+                        'raise','notice','info','warning','error','exception',
+                        'set','into','from','where',
+                        'int','integer','bigint','smallint','numeric','float','double','boolean',
+                        'varchar','char','text','date','time','timestamp','timestamptz',
+                        'interval','json','jsonb','uuid','oid','serial','bytea',
+                        'precision','varying','without','zone','with','minute','second','day','month','year',
+                        'matched','not matched','merge','when',
+                        'restart','identity','cascade','restrict','no','action',
+                        'if','return','returns','strict','called','volatile','stable','immutable',
+                        'security','definer','invoker','external','modifies','reads','contains','sql',
+                    ]);
+
+                    if (INLINE_KW.has(lw)) {
+                        if (!out.endsWith(' ') && !out.endsWith('\n') && !out.endsWith('(')) sp();
+                        write(lw.toUpperCase());
+                        prevTok = tok; j++; continue;
+                    }
+
+                    // ── Everything else: plain identifier / function name ──
+                    if (!out.endsWith(' ') && !out.endsWith('\n') && !out.endsWith('(') && !out.endsWith('.') && !out.endsWith('::') && out !== '') sp();
+                    write(tok.v);
+                    prevTok = tok; j++; continue;
+                }
+
+                j++;
+            }
+
+            // ── Step 4: Final cleanup & targeted fixes ───────────────────
+            let result = out;
+
+            // Fix 1: Any stray space after :: (e.g. col:: TEXT from pre-tokenized input)
+            result = result.replace(/::\s+([A-Za-z])/g, '::$1');
+
+            // Fix 1b: `: =` PL/pgSQL assignment with spaces → `:=`
+            result = result.replace(/\s*:\s*=\s*/g, ' := ');
+
+            // Fix 2: `alias. *` → `alias.*` (wildcard with space)
+            result = result.replace(/(\w)\.\s+\*/g, '$1.*');
+
+            // Fix 3: `-  1` / `- 100` negative numeric literal after comma/paren → `-1`
+            // Handles cases where minus was tokenized separately from its number
+            result = result.replace(/([\(,]\s*)- (\d)/g, '$1-$2');
+            // Also handle ISNULL(x, - 1) pattern
+            result = result.replace(/,\s*-\s+(\d)/g, ', -$1');
+
+            // Fix 4: Redundant double-cast string literals like 'arena'::CHARACTER VARYING::TEXT → 'arena'
+            result = result.replace(/'([^']+)'::CHARACTER\s+VARYING::TEXT/g, "'$1'");
+            result = result.replace(/'([^']+)'::character\s+varying::text/gi, "'$1'");
+            result = result.replace(/'([^']+)'::CHARACTER\s+VARYING/g, "'$1'");
+            result = result.replace(/'([^']+)'::character\s+varying/gi, "'$1'");
+
+            // Fix 5: Ensure all INSERT INTO is uppercase (catches any that slipped through)
+            result = result.replace(/\binsert\s+into\b/gi, 'INSERT INTO');
+            result = result.replace(/\binsert\b(?!\s+INTO)/gi, 'INSERT');
+
+            // Fix 6: NULL::TIMESTAMP / NULL::TEXT — normalise type casing
+            result = result.replace(/\bNULL::[Tt]imestamp\b/g, 'NULL::TIMESTAMP');
+            result = result.replace(/\bNULL::[Tt]ext\b/g, 'NULL::TEXT');
+            result = result.replace(/\bnull::/gi, 'NULL::');
+
+            // Fix 7: Collapse blank lines inside DECLARE..BEGIN block
+            result = result.replace(/DECLARE\n([\s\S]*?)(?=\nBEGIN)/g, (match, body) => {
+                return 'DECLARE\n' + body.replace(/\n{2,}/g, '\n');
+            });
+
+            // Fix 8: BETWEEN x\nAND y — fold back into one line
+            result = result.replace(/BETWEEN ([^\n]+)\nAND /g, 'BETWEEN $1 AND ');
+
+            // Fix 9: SET block — indent all assignment lines under SET that start at col 0
+            // Strategy: find each \nSET\n block and indent every non-empty line that isn't already indented
+            const setLines = result.split('\n');
+            let inSetBlock = false;
+            const fixedLines = setLines.map((line, idx) => {
+                if (line.trim() === 'SET') { inSetBlock = true; return line; }
+                if (inSetBlock) {
+                    if (!line.trim()) return line; // blank line — leave, will be stripped later
+                    // Stop indenting at next top-level clause or statement
+                    if (/^(WHERE|FROM|AND |OR |LIMIT|ORDER|GROUP|HAVING|RETURNING|COMMIT|END|BEGIN|INSERT|UPDATE|DELETE|DROP|CREATE|GET|EXCEPTION|\$\$|--)/i.test(line.trim())) {
+                        inSetBlock = false; return line;
+                    }
+                    // Already indented? keep as-is
+                    if (line.startsWith('    ')) return line;
+                    return '    ' + line;
+                }
+                return line;
+            });
+            result = fixedLines.join('\n');
+
+            // Fix 10: || spacing — ensure single space on each side
+            result = result.replace(/\s*\|\|\s*/g, ' || ');
+
+            // Fix 11: trim trailing spaces per line, collapse 3+ blank lines
+            result = result
+                .split('\n')
+                .map(l => l.trimEnd())
+                .join('\n')
+                .replace(/\n{3,}/g, '\n\n')
+                .replace(/\(\s+\)/g, '()')
+                .trim();
+
+            return result;
+        }
+
+        /* ══════════════════════════════════════════════════════════════════════
+           LIGHTWEIGHT SQL SYNTAX HIGHLIGHTER
+        ══════════════════════════════════════════════════════════════════════ */
+        const SQL_KW = new Set([
+            'select','from','where','join','inner','left','right','outer','full','cross','natural','on','using',
+            'group','order','by','having','limit','offset','union','all','intersect','except',
+            'insert','into','update','set','delete','truncate','merge','values','returning',
+            'create','drop','alter','table','view','index','procedure','function','materialized','schema',
+            'with','as','case','when','then','else','end','cast','coalesce','nullif',
+            'and','or','not','in','is','null','between','exists','any','some','like','ilike','similar','to',
+            'over','partition','window','row','rows','range','unbounded','preceding','following','current',
+            'boolean','int','integer','smallint','bigint','numeric','decimal','float','double','real','serial',
+            'varchar','char','text','date','time','timestamp','timestamptz','interval','json','jsonb','uuid',
+            'true','false','default','constraint','primary','foreign','key','references','unique','check',
+            'begin','declare','exception','commit','rollback','loop','elsif','raise','return','returns','call',
+            'asc','desc','distinct','nulls','first','last'
+        ]);
+        const SQL_FN = new Set([
+            'count','sum','avg','min','max','greatest','least',
+            'substring','substr','trim','ltrim','rtrim','upper','lower','length','replace',
+            'row_number','rank','dense_rank','ntile','lag','lead','first_value','last_value',
+            'extract','date_part','date_trunc','now','getdate','sysdate','dateadd','datediff'
+        ]);
+
+        function syntaxHighlight(sql) {
+            if (!sql) return null;
+            // Match comments, strings, identifiers/keywords, numbers, operators/punctuation, and whitespace
+            const regex = /(--.*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"|`[^`]*`|\b\d+(?:\.\d+)?\b|\b[A-Za-z_][A-Za-z0-9_$]*\b|\s+|.)/g;
+            const parts = sql.match(regex) || [];
+
+            return parts.map((part, i) => {
+                if (part.startsWith('--') || part.startsWith('/*')) {
+                    return <span key={i} className="text-slate-400 dark:text-slate-500 italic">{part}</span>;
+                }
+                if (part.startsWith("'")) {
+                    return <span key={i} className="text-emerald-600 dark:text-emerald-400">{part}</span>;
+                }
+                if (part.startsWith('"') || part.startsWith('`')) {
+                    return <span key={i} className="text-amber-600 dark:text-amber-500">{part}</span>;
+                }
+                if (/^\d+(?:\.\d+)?$/.test(part)) {
+                    return <span key={i} className="text-pink-600 dark:text-pink-400">{part}</span>;
+                }
+                if (/^[A-Za-z_]/.test(part)) {
+                    const lw = part.toLowerCase();
+                    if (SQL_KW.has(lw)) return <span key={i} className="text-violet-600 dark:text-violet-400 font-semibold">{part}</span>;
+                    if (SQL_FN.has(lw)) return <span key={i} className="text-blue-600 dark:text-blue-400">{part}</span>;
+                    return <span key={i} className="text-slate-700 dark:text-slate-300">{part}</span>;
+                }
+                // operators and whitespace fallback
+                return <span key={i} className="text-slate-500 dark:text-slate-400">{part}</span>;
+            });
+        }
+
+
+        /* ══════════════════════════════════════════════════════════════════════
+           MAIN APP
+        ══════════════════════════════════════════════════════════════════════ */
+        function App() {
+            const [inputText,    setInputText]    = useState('');
+            const [outputText,   setOutputText]   = useState('');
+            const [fileName,     setFileName]     = useState('script.sql');
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [copied,       setCopied]       = useState(false);
+            const [stats,        setStats]        = useState(null);
+            const [autoAlias,    setAutoAlias]    = useState(false);
+            const [removeNL,     setRemoveNL]     = useState(false);
+            const [isDark,       setIsDark]       = useState(false);
+            const [error,        setError]        = useState(null);
+            const [splitPct,     setSplitPct]     = useState(50);
+            const [isDragging,   setIsDragging]   = useState(false);
+            const [isDragOver,   setIsDragOver]   = useState(false);
+            const [showReport,   setShowReport]   = useState(false);
+            const [mode,         setMode]         = useState('minify'); // 'minify' | 'beautify'
+
+            const windowWidth = useWindowWidth();
+            const isDesktop   = windowWidth >= 1024;
+            const containerRef = useRef(null);
+            const fileInputRef = useRef(null);
+
+            // Apply dark mode class to <html>
+            useEffect(() => {
+                document.documentElement.classList.toggle('dark', isDark);
+            }, [isDark]);
+
+            // Drag-to-resize
+            const onMove = useCallback((cx, cy) => {
+                if (!isDragging || !containerRef.current) return;
+                const r = containerRef.current.getBoundingClientRect();
+                const pct = isDesktop
+                    ? ((cx - r.left) / r.width)  * 100
+                    : ((cy - r.top)  / r.height) * 100;
+                setSplitPct(Math.max(20, Math.min(80, pct)));
+            }, [isDragging, isDesktop]);
+
+            useEffect(() => {
+                const mm = e => onMove(e.clientX, e.clientY);
+                const mu = () => setIsDragging(false);
+                if (isDragging) {
+                    document.addEventListener('mousemove', mm);
+                    document.addEventListener('mouseup',   mu);
+                }
+                return () => {
+                    document.removeEventListener('mousemove', mm);
+                    document.removeEventListener('mouseup',   mu);
+                };
+            }, [isDragging, onMove]);
+
+            // Ctrl/Cmd+Enter
+            useEffect(() => {
+                const onKey = e => {
+                    if ((e.ctrlKey||e.metaKey) && e.key==='Enter' && inputText && !isProcessing) {
+                        e.preventDefault(); handleProcess();
+                    }
+                };
+                window.addEventListener('keydown', onKey);
+                return () => window.removeEventListener('keydown', onKey);
+            }, [inputText, isProcessing]);
+
+            // Re-process when checkboxes change if output already exists (minify mode only)
+            useEffect(() => {
+                if (inputText && outputText && mode === 'minify') {
+                    processText(inputText, 'minify');
+                }
+            }, [autoAlias, removeNL]);
+
+            function processText(text, currentMode) {
+                if (!text) return;
+                const m = currentMode || mode;
+                setIsProcessing(true); setStats(null); setError(null);
+                setTimeout(() => {
+                    try {
+                        if (m === 'beautify') {
+                            const out = sqlBeautify(text);
+                            setOutputText(out);
+                        } else {
+                            const slc  = (text.match(/--[^\n]*/g)||[]).length;
+                            const mlc  = (text.match(/\/\*[\s\S]*?\*\//g)||[]).length;
+                            const oLns = text.split('\n').filter(l => l.trim() !== '').length;
+                            const oChr = text.length;
+                            let out    = astMinifyEngine(text, autoAlias);
+                            if (removeNL) out = out.replace(/\n+/g,' ').replace(/  +/g,' ').trim();
+                            const mLns = out.split('\n').filter(l => l.trim() !== '').length;
+                            const mChr = out.length;
+                            const oSz  = new Blob([text]).size;
+                            const mSz  = new Blob([out]).size;
+                            setOutputText(out);
+                            setStats({
+                                originalSize:oSz, minifiedSize:mSz, originalChars:oChr, minifiedChars:mChr,
+                                originalLines:oLns, minifiedLines:mLns, singleLineComments:slc, multiLineComments:mlc,
+                                totalComments:slc+mlc,
+                                reduction:    (((oSz-mSz)/oSz)*100).toFixed(1),
+                                charReduction:(((oChr-mChr)/oChr)*100).toFixed(1),
+                                lineReduction:(((oLns-mLns)/oLns)*100).toFixed(1),
+                            });
+                        }
+                    } catch(err) {
+                        console.error(err);
+                        setError(err.message || 'Unexpected error during processing.');
+                    } finally {
+                        setIsProcessing(false);
+                    }
+                }, 50);
+            }
+
+            function handleProcess() {
+                processText(inputText, mode);
+            }
+
+            function handleModeSwitch(newMode) {
+                if (mode === newMode) return;
+                setMode(newMode);
+                setShowReport(false);
+                
+                if (inputText.trim()) {
+                    processText(inputText, newMode);
+                } else {
+                    setOutputText('');
+                    setStats(null);
+                    setError(null);
+                }
+            }
+
+            function handleFileUpload(e) {
+                const file = e.target.files[0]; if (!file) return;
+                setFileName(file.name);
+                const r = new FileReader();
+                r.onload = ev => {
+                    const text = ev.target.result;
+                    setInputText(text);
+                    setOutputText('');
+                    setStats(null);
+                    // Auto-process immediately
+                    setTimeout(() => processText(text), 50);
+                };
+                r.readAsText(file); e.target.value = null;
+            }
+
+            async function handleCopy() {
+                if (!outputText) return;
+                try { await navigator.clipboard.writeText(outputText); }
+                catch(_) {
+                    const ta = document.createElement('textarea');
+                    ta.value = outputText;
+                    ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px';
+                    document.body.appendChild(ta); ta.focus(); ta.select();
+                    try { document.execCommand('copy'); } catch(e2){}
+                    document.body.removeChild(ta);
+                }
+                setCopied(true); setTimeout(()=>setCopied(false), 1500);
+            }
+
+            function handleDownload() {
+                if (!outputText) return;
+                const parts = fileName.split('.');
+                const ext   = parts.length>1 ? `.${parts.pop()}` : '.sql';
+                const base  = parts.join('.')||'script';
+                const blob  = new Blob([outputText],{type:'text/sql'});
+                const url   = URL.createObjectURL(blob);
+                const a     = document.createElement('a');
+                a.href=url; a.download=`${base}${mode === 'beautify' ? '.fmt' : '.min'}${ext}`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            function handleClear() { setInputText(''); setOutputText(''); setStats(null); setError(null); }
+
+            const inputLines = inputText ? inputText.split('\n').length : 0;
+
+            const leftStyle  = isDesktop
+                ? { width:`${splitPct}%`,                  height:'100%' }
+                : { width:'100%', height:`${splitPct}%` };
+            const rightStyle = isDesktop
+                ? { width:`calc(${100-splitPct}% - 6px)`,  height:'100%' }
+                : { width:'100%', height:`calc(${100-splitPct}% - 6px)` };
+
+            return (
+                <div style={{height:'100vh',display:'flex',flexDirection:'column'}}
+                     className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-200">
+
+                    {/* HEADER */}
+                    <header className="shrink-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 z-20">
+                        <div className="px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 shrink-0">
+                                <Database className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                <h1 className="text-base font-bold tracking-tight">
+                                    SQL <span className="text-slate-400 dark:text-slate-500 font-normal">| Minifier & Beautifier</span>
+                                </h1>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <Tooltip content={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'} position="bottom-right">
+                                    <button onClick={()=>setIsDark(!isDark)}
+                                        className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors">
+                                        {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                                    </button>
+                                </Tooltip>
+                            </div>
+                        </div>
+                        <div className="h-0.5 bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                            <div className={`h-full bg-blue-500 transition-all duration-300 ${isProcessing ? 'w-full animate-pulse' : 'w-0'}`} />
+                        </div>
+                    </header>
+
+                    {/* ERROR TOAST */}
+                    {error && (
+                        <div className="shrink-0 mx-4 mt-2 px-4 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-400 flex items-center justify-between fade-in">
+                            <span>⚠ AST Error: {error}</span>
+                            <button onClick={()=>setError(null)} className="ml-3 font-bold text-red-400 hover:text-red-600">✕</button>
+                        </div>
+                    )}
+
+                    {/* SPLIT PANE */}
+                    <main ref={containerRef} className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+
+                        {/* LEFT — Input */}
+                        <div className="flex flex-col overflow-hidden bg-white dark:bg-slate-900 relative" style={leftStyle}
+                            onDragOver={e=>{e.preventDefault();setIsDragOver(true);}}
+                            onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget))setIsDragOver(false);}}
+                            onDrop={e=>{
+                                e.preventDefault(); setIsDragOver(false);
+                                const file = e.dataTransfer.files[0];
+                                if (!file) return;
+                                setFileName(file.name);
+                                const r = new FileReader();
+                                r.onload = ev => {
+                                    const text = ev.target.result;
+                                    setInputText(text); setOutputText(''); setStats(null);
+                                    setTimeout(() => processText(text), 50);
+                                };
+                                r.readAsText(file);
+                            }}>
+                            {isDragOver && (
+                                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-blue-50/90 dark:bg-blue-900/40 border-2 border-dashed border-blue-400 dark:border-blue-500 rounded pointer-events-none">
+                                    <FileUp className="h-10 w-10 text-blue-400 mb-2" />
+                                    <span className="text-sm font-semibold text-blue-600 dark:text-blue-300">Drop SQL file here</span>
+                                </div>
+                            )}
+                            <div className="shrink-0 h-12 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between px-3 gap-2">
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <FileCode2 className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300 whitespace-nowrap">Source SQL</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                    <input type="file" accept=".sql,.txt" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
+                                    <Tooltip content={isProcessing ? 'Processing…' : mode === 'beautify' ? 'Beautify SQL (Ctrl+Enter)' : 'Minify SQL (Ctrl+Enter)'} position="bottom-right">
+                                        <button onClick={handleProcess} disabled={!inputText || isProcessing}
+                                            className={`flex items-center justify-center p-1.5 rounded-md border shadow-sm transition-all
+                                                ${!inputText||isProcessing
+                                                    ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                                                    : mode === 'beautify'
+                                                        ? 'bg-violet-600 border-violet-600 text-white hover:bg-violet-500 cursor-pointer'
+                                                        : 'bg-blue-600 border-blue-600 text-white hover:bg-blue-500 cursor-pointer'}`}>
+                                            {isProcessing ? <Activity className="h-3.5 w-3.5 animate-pulse" /> : mode === 'beautify' ? <Wand2 className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 fill-current" />}
+                                        </button>
+                                    </Tooltip>
+                                    <Tooltip content="Upload SQL file" position="bottom-right">
+                                        <button onClick={()=>fileInputRef.current?.click()}
+                                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 shadow-sm transition-all whitespace-nowrap">
+                                            <FileUp className="h-3.5 w-3.5" />
+                                            <span className="hidden xl:inline">Upload</span>
+                                        </button>
+                                    </Tooltip>
+                                    {inputText && (
+                                        <Tooltip content="Clear all" position="bottom-right">
+                                            <button onClick={handleClear}
+                                                className="flex items-center justify-center p-1.5 rounded-md text-red-500 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20 transition-colors">
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </Tooltip>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex-1 overflow-hidden min-h-0">
+                                <textarea
+                                    value={inputText}
+                                    onChange={e=>setInputText(e.target.value)}
+                                    placeholder={"-- Paste your SQL script here…\n-- Press Ctrl+Enter (⌘↵) to minify"}
+                                    className="w-full h-full resize-none p-4 focus:outline-none font-fira text-sm leading-relaxed text-slate-800 dark:text-slate-300 bg-transparent placeholder-slate-400 dark:placeholder-slate-600"
+                                    spellCheck="false"
+                                />
+                            </div>
+                            <div className="shrink-0 h-8 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 text-xs text-slate-500 dark:text-slate-400">
+                                <span className="truncate max-w-xs">{inputText ? fileName : 'No file'}</span>
+                                <span className="tabular-nums shrink-0">
+                                    {inputLines > 0 ? `${inputLines.toLocaleString()} ln · ` : ''}
+                                    {formatBytes(new Blob([inputText]).size)}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* DIVIDER */}
+                        <div
+                            className={`shrink-0 bg-slate-200 dark:bg-slate-800 hover:bg-blue-400 dark:hover:bg-blue-600 transition-colors z-10 flex items-center justify-center select-none
+                                ${isDesktop ? 'w-1.5 h-full cursor-col-resize' : 'h-1.5 w-full cursor-row-resize'}`}
+                            onMouseDown={()=>setIsDragging(true)}
+                            title="Drag to resize"
+                        >
+                            <span className="text-slate-400 dark:text-slate-600 text-xs pointer-events-none">⋮</span>
+                        </div>
+
+                        {/* RIGHT — Output */}
+                        <div className="flex flex-col overflow-hidden bg-white dark:bg-slate-900" style={rightStyle}>
+                            <div className="shrink-0 h-12 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between px-3">
+                                <div className="flex items-center gap-2">
+                                    {/* Mode toggle pills */}
+                                    <div className="flex items-center gap-0.5 bg-slate-200 dark:bg-slate-700 rounded-lg p-0.5">
+                                        <Tooltip content="Minify SQL — strip whitespace & comments" position="bottom-left">
+                                            <button onClick={()=>handleModeSwitch('minify')}
+                                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                                                    mode === 'minify'
+                                                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
+                                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                                                }`}>
+                                                <Zap className="h-3 w-3" />
+                                                Minify
+                                            </button>
+                                        </Tooltip>
+                                        <Tooltip content="Beautify SQL — format with indentation" position="bottom-left">
+                                            <button onClick={()=>handleModeSwitch('beautify')}
+                                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                                                    mode === 'beautify'
+                                                        ? 'bg-white dark:bg-slate-900 text-violet-600 dark:text-violet-400 shadow-sm'
+                                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                                                }`}>
+                                                <Wand2 className="h-3 w-3" />
+                                                Beautify
+                                            </button>
+                                        </Tooltip>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {mode === 'minify' && (
+                                    <div className="flex items-center gap-1.5">
+                                        <Tooltip content="Auto-generate aliases for unaliased tables" position="bottom-right">
+                                            <label className="flex items-center gap-1 cursor-pointer px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors whitespace-nowrap">
+                                                <input type="checkbox" checked={autoAlias} onChange={e=>setAutoAlias(e.target.checked)} className="w-3 h-3 rounded accent-blue-600" />
+                                                <Settings2 className="h-3 w-3 text-slate-500 dark:text-slate-400" />
+                                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400 hidden lg:inline">Auto-Alias</span>
+                                            </label>
+                                        </Tooltip>
+                                        <Tooltip content="Output as a single line (removes all newlines)" position="bottom-right">
+                                            <label className="flex items-center gap-1 cursor-pointer px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors whitespace-nowrap">
+                                                <input type="checkbox" checked={removeNL} onChange={e=>setRemoveNL(e.target.checked)} className="w-3 h-3 rounded accent-purple-600" />
+                                                <Zap className="h-3 w-3 text-slate-500 dark:text-slate-400" />
+                                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400 hidden lg:inline">Single Line</span>
+                                            </label>
+                                        </Tooltip>
+                                        <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 shrink-0" />
+                                    </div>
+                                    )}
+                                    <Tooltip content={copied ? 'Copied!' : 'Copy to clipboard'} position="bottom-right">
+                                        <button onClick={handleCopy} disabled={!outputText}
+                                            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed
+                                                ${copied
+                                                    ? 'border-emerald-400 text-emerald-600 bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 dark:bg-emerald-900/20'
+                                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'}`}>
+                                            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                                            {copied ? 'Copied!' : 'Copy'}
+                                        </button>
+                                    </Tooltip>
+                                    <Tooltip content={mode === 'beautify' ? 'Download beautified SQL file' : 'Download minified SQL file'} position="bottom-right">
+                                        <button onClick={handleDownload} disabled={!outputText}
+                                            className="flex items-center justify-center p-1.5 rounded-md bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                                            <Download className="h-3.5 w-3.5" />
+                                        </button>
+                                    </Tooltip>
+                                </div>
+                            </div>
+                            
+                            <div className="flex-1 overflow-hidden min-h-0 bg-white dark:bg-slate-900">
+                                {mode === 'beautify' && outputText ? (
+                                    <pre className="w-full h-full overflow-auto p-4 font-fira text-sm leading-relaxed whitespace-pre-wrap break-words m-0 selection:bg-blue-200 dark:selection:bg-blue-900/50">
+                                        {syntaxHighlight(outputText)}
+                                    </pre>
+                                ) : (
+                                    <textarea
+                                        value={outputText}
+                                        readOnly
+                                        placeholder={mode === 'beautify' ? 'Beautified output will appear here…' : 'Minified output will appear here…'}
+                                        className="w-full h-full resize-none p-4 focus:outline-none font-fira text-sm leading-relaxed text-slate-700 dark:text-slate-400 bg-transparent placeholder-slate-300 dark:placeholder-slate-700"
+                                        spellCheck="false"
+                                    />
+                                )}
+                            </div>
+
+                            {/* STATS PANEL */}
+                            {mode === 'minify' && stats && outputText && showReport && (
+                                <div className="shrink-0 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 overflow-y-auto max-h-64 stats-reveal">
+                                    <div className="px-3 pt-2.5 pb-2">
+                                        <div className="flex items-center gap-1.5 mb-2">
+                                            <Activity className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400" />
+                                            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Minification Report</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5 mb-2">
+                                            {[
+                                                { label:'Original Size',     val:formatBytes(stats.originalSize),  cls:'text-slate-700 dark:text-slate-300' },
+                                                { label:'Minified Size',     val:formatBytes(stats.minifiedSize),  cls:'text-emerald-600 dark:text-emerald-400' },
+                                                { label:'Space Saved',       val:`${stats.reduction}%`,            cls:'text-emerald-700 dark:text-emerald-400', accent:true },
+                                                { label:'Original Lines',    val:stats.originalLines.toLocaleString(), cls:'text-slate-700 dark:text-slate-300' },
+                                                { label:'Output Lines',      val:stats.minifiedLines.toLocaleString(), cls:'text-blue-600 dark:text-blue-400' },
+                                                { label:'Lines Removed',     val:`${(stats.originalLines-stats.minifiedLines).toLocaleString()} (${stats.lineReduction}%)`, cls:'text-purple-600 dark:text-purple-400' },
+                                                { label:'Original Chars',    val:stats.originalChars.toLocaleString(), cls:'text-slate-700 dark:text-slate-300', md:true },
+                                                { label:'Output Chars',      val:stats.minifiedChars.toLocaleString(), cls:'text-blue-600 dark:text-blue-400', md:true },
+                                                { label:'Comments Stripped', val:`${stats.totalComments} (${stats.singleLineComments}-- / ${stats.multiLineComments}/**/)`, cls:'text-orange-600 dark:text-orange-400' },
+                                            ].map(({label,val,cls,accent,md}) => (
+                                                <div key={label} className={`${md?'hidden md:block':''} ${accent?'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800':'bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-700'} border rounded-md px-2.5 py-1.5`}>
+                                                    <div className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">{label}</div>
+                                                    <div className={`text-xs font-semibold ${cls}`}>{val}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
+                                            <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-700"
+                                                style={{width:`${parseFloat(stats.reduction)}%`}} />
+                                        </div>
+                                        <div className="flex justify-between text-xs text-slate-400 dark:text-slate-600">
+                                            <span>0%</span>
+                                            <span>100%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="shrink-0 h-8 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 grid grid-cols-3 items-center px-3 text-xs text-slate-500 dark:text-slate-400">
+                                {mode === 'minify'
+                                    ? <span>Final: {stats ? formatBytes(stats.minifiedSize) : '—'}</span>
+                                    : <span>Output: {outputText ? `${outputText.split('\n').filter(l=>l.trim()).length} lines` : '—'}</span>
+                                }
+                                {mode === 'minify' && stats && (
+                                    <Tooltip content={showReport ? 'Hide minification report' : 'Show minification report'} position="top">
+                                        <button onClick={()=>setShowReport(v=>!v)}
+                                            className={`justify-self-center flex items-center gap-1.5 px-2.5 py-0.5 rounded-full transition-all cursor-pointer hover:scale-105 active:scale-95 ${
+                                                showReport
+                                                    ? 'bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700'
+                                                    : 'border border-transparent'
+                                            }`}>
+                                            <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full transition-all shadow-sm ${
+                                                showReport
+                                                    ? 'bg-gradient-to-br from-yellow-300 to-amber-400 dark:from-amber-500 dark:to-amber-600 border border-amber-300 dark:border-amber-500'
+                                                    : 'bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:border-amber-300 dark:hover:border-amber-500'
+                                            }`}>
+                                                <Lightbulb className={`h-3 w-3 transition-all ${
+                                                    showReport
+                                                        ? 'text-amber-700 dark:text-amber-100 fill-amber-500 dark:fill-amber-300'
+                                                        : 'text-slate-400 dark:text-slate-500'
+                                                }`} />
+                                            </span>
+                                            <span className={`text-xs font-semibold tabular-nums transition-colors ${
+                                                showReport
+                                                    ? 'text-amber-700 dark:text-amber-200'
+                                                    : 'text-emerald-600 dark:text-emerald-400'
+                                            }`}>{stats.reduction}% saved</span>
+                                        </button>
+                                    </Tooltip>
+                                )}
+                                {mode === 'beautify' && outputText && (
+                                    <span className="justify-self-center flex items-center gap-1 text-violet-600 dark:text-violet-400 font-semibold">
+                                        <Wand2 className="h-3 w-3" /> Formatted
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                    </main>
+                </div>
+            );
+        }
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
