@@ -239,7 +239,7 @@
 
                 // Pass A: alias pre-computation
                 {
-                    let ps='NORMAL', pFrom=false, pExp=false, pD=0;
+                    let ps='NORMAL', pFrom=false, pExp=false, pD=0, psDmlVerb='';
                     const cands=[];
                     for (let j=0; j<stmt.length; j++) {
                         const t=stmt[j];
@@ -252,12 +252,30 @@
                         }
                         if(t.type!=='word') continue;
                         const lw=t.val.toLowerCase(), cl=lw.replace(/["`]/g,'');
-                        if(['update','delete','insert','truncate','merge'].includes(lw)){ps='EXPECT_TARGET';}
+                        if(['update','delete','insert','truncate','merge'].includes(lw)){ps='EXPECT_TARGET';psDmlVerb=lw;}
                         else if(ps==='EXPECT_TARGET'){
                             if(!['into','from','table','overwrite','only'].includes(lw)){
                                 dmlTargets.add(cl);
                                 const dp=cl.split('.'); if(dp.length>1)dmlTargets.add(dp[dp.length-1]);
                                 ps='NORMAL';
+                                // Only UPDATE targets support aliases in Redshift — skip INSERT/DELETE/TRUNCATE/MERGE
+                                if(psDmlVerb==='update'){
+                                    const parts=cl.split('.'), base=parts[parts.length-1];
+                                    let ni=j+1;
+                                    while(stmt[ni]&&(stmt[ni].type==='space'||stmt[ni].type==='newline'))ni++;
+                                    const nt=stmt[ni], nw2=nt?.val?.toLowerCase()||'';
+                                    const nIA2=nt?.type==='word'&&!KW.has(nw2)&&!['set','where','from'].includes(nw2);
+                                    if(nIA2){ tAliases[cl]=nw2; if(parts.length>1)tAliases[base]=nw2; j=ni; }
+                                    else if(nw2==='as'){
+                                        let ai=ni+1;
+                                        while(stmt[ai]&&(stmt[ai].type==='space'||stmt[ai].type==='newline'))ai++;
+                                        const act=stmt[ai]?.val?.toLowerCase();
+                                        if(act&&stmt[ai]?.type==='word'&&!KW.has(act)){ tAliases[cl]=act; if(parts.length>1)tAliases[base]=act; j=ai; }
+                                    } else if(enableAutoAlias&&cl.length>2&&!tAliases[cl]){
+                                        // auto-alias the UPDATE target table too
+                                        if(!cands.some(c=>c.cl===cl))cands.push({cl,base,parts});
+                                    }
+                                }
                             }
                         }
                         if(['from','join'].includes(lw)){
@@ -305,7 +323,7 @@
                 }
 
                 // Pass B: transform + minify
-                let fClause=false, expT=false, dmlSt='NORMAL', dep=0;
+                let fClause=false, expT=false, dmlSt='NORMAL', dep=0, inSetClause=false, dmlVerb='';
                 for(let j=0; j<stmt.length; j++){
                     const t=stmt[j];
                     if(t.type==='space'||t.type==='newline'){
@@ -327,16 +345,36 @@
                     }
                     if(t.type==='word'){
                         const lw=val.toLowerCase(), cl=lw.replace(/["`]/g,'');
-                        if(['update','delete','insert','truncate','merge'].includes(lw)){dmlSt='EXPECT_TARGET';}
+                        if(['update','delete','insert','truncate','merge'].includes(lw)){dmlSt='EXPECT_TARGET';dmlVerb=lw;}
                         else if(dmlSt==='EXPECT_TARGET'){
                             if(!['into','from','table','overwrite','only'].includes(lw)){
-                                dmlSt='NORMAL'; result+=lw; prevType=t.type; continue;
+                                dmlSt='NORMAL';
+                                // Only UPDATE supports alias on target in Redshift — emit bare name for all others
+                                if(dmlVerb==='update'){
+                                    let ni=j+1;
+                                    while(stmt[ni]&&(stmt[ni].type==='space'||stmt[ni].type==='newline'))ni++;
+                                    const nw2=stmt[ni]?.val?.toLowerCase()||'';
+                                    const aliasForTarget=tAliases[cl];
+                                    const nextIsAlias=aliasForTarget&&nw2===aliasForTarget;
+                                    const nextIsAs=nw2==='as';
+                                    if(nextIsAlias||nextIsAs){
+                                        result+=lw; prevType=t.type; continue;
+                                    } else if(aliasForTarget){
+                                        result+=lw+' '+aliasForTarget; prevType=t.type; continue;
+                                    } else {
+                                        result+=lw; prevType=t.type; continue;
+                                    }
+                                } else {
+                                    result+=lw; prevType=t.type; continue;
+                                }
                             }
                         }
                         if(['from','join'].includes(lw)){
                             if(lw==='from'&&isFuncFrom(stmt,j)){}
                             else{fClause=true;expT=true;}
-                        } else if(CT.has(lw)){fClause=false;expT=false;}
+                            inSetClause=false;
+                        } else if(lw==='set'&&dmlSt==='NORMAL'){inSetClause=true;fClause=false;expT=false;}
+                        else if(CT.has(lw)&&lw!=='set'){fClause=false;expT=false;inSetClause=false;}
                         else if(lw==='as'){expT=false;}
                         else if(expT&&!KW.has(lw)){
                             expT=false;
@@ -353,7 +391,10 @@
                         else{
                             const sk=Object.keys(tAliases).sort((a,b)=>b.length-a.length);
                             const ma=sk.find(k=>cl.startsWith(k+'.'));
-                            val=ma?tAliases[ma]+cl.slice(ma.length):lw;
+                            // In SET clause, bare column names (no dot) are LHS assignments — don't alias them
+                            if(ma){ val=tAliases[ma]+cl.slice(ma.length); }
+                            else if(inSetClause&&!cl.includes('.')){ val=lw; }
+                            else{ val=lw; }
                         }
                     }
                     result+=val; prevType=t.type;
@@ -1550,7 +1591,7 @@
                                 <div className="flex items-center gap-2">
                                     {mode === 'minify' && (
                                     <div className="flex items-center gap-1.5">
-                                        <Tooltip content="Auto-generate aliases for unaliased tables" position="bottom-right">
+                                        <Tooltip content="Auto-generate aliases for tables including UPDATE target (Redshift-compatible)" position="bottom-right">
                                             <label className="flex items-center gap-1 cursor-pointer px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors whitespace-nowrap">
                                                 <input type="checkbox" checked={autoAlias} onChange={e=>setAutoAlias(e.target.checked)} className="w-3 h-3 rounded accent-blue-600" />
                                                 <Settings2 className="h-3 w-3 text-slate-500 dark:text-slate-400" />
