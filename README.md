@@ -1,8 +1,6 @@
 # SQL Canvas
 
 **SQL Canvas** is a high-performance Single Page Application that instantly **formats, cleans, and compresses SQL scripts** — entirely in your browser, with no backend, no build steps, and no data ever leaving your machine.
-This app is developed using AI.
-
 ---
 
 ## Live Demo
