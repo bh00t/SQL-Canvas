@@ -3,12 +3,16 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Cache control: always revalidate with server, never serve stale HTML -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>SQL Canvas | Workspace</title>
     <meta name="description" content="SQL Canvas — a free browser-based workspace for data engineers. Minify, beautify, shorten and format SQL online. Auto-alias tables, output single-line SQL, and visualise SQL data flow as an interactive diagram. Supports Redshift, PostgreSQL, MySQL, Snowflake, BigQuery. No install, no sign-up." />
     <meta name="keywords" content="SQL minifier, SQL beautifier, SQL formatter, SQL beautify, SQL minify, SQL shortener, SQL shortner, shorten SQL, compress SQL, SQL compressor, auto alias SQL, SQL auto alias, table alias generator, single line SQL, SQL one liner, SQL one-liner, flatten SQL, SQL canvas, minify SQL online, beautify SQL online, format SQL online, SQL data flow, SQL lineage, SQL diagram, SQL visualiser, SQL flow diagram, SQL dependency diagram, data flow diagram, download data flow, download data diagram, data diagram, stored procedure flow, AWS Redshift data flow, AWS Redshift SQL, PostgreSQL formatter, MySQL data flow, SQL query data flow, data engineer tools, data engineer, DB tools, database tools, SQL tools, SQL, data science, data engineering, SQL online tool, free SQL tool, SQL workspace, SQL editor, SQL pipeline visualiser, CTE visualiser, SQL CTE diagram, SQL query optimiser, Redshift SQL formatter, BigQuery SQL formatter, Snowflake SQL formatter" />
     <meta name="author" content="SQL Canvas" />
     <!-- Google Search Console ownership verification — replace XXXX with your actual code from Search Console -->
-    <meta name="google-site-verification" content="PASTE_YOUR_CODE_HERE" />
+    <meta name="google-site-verification" content="YzjH7wClSqodZh7KF6llQr9JmNGp_iSIuG6q-RVA-ZM" />
     <link rel="canonical" href="https://bh00t.github.io/SQL-Canvas/" />
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
@@ -19,6 +23,27 @@
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="SQL Canvas | Workspace" />
     <meta name="twitter:description" content="Minify, beautify and visualise SQL data flow in your browser." />
+
+    <!-- Dark mode: apply class synchronously before first paint to prevent flash -->
+    <script>
+        (function () {
+            try {
+                var stored = localStorage.getItem('sqlcanvas-dark');
+                // 'sqlcanvas-dark-v2' is a new key — old browsers with stale '1' will
+                // never match it, so they cleanly get light mode on first load after deploy.
+                // Only honour dark if the user explicitly set it in THIS version.
+                var v2 = localStorage.getItem('sqlcanvas-dark-v2');
+                if (v2 === '1') {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    if (v2 === null) localStorage.setItem('sqlcanvas-dark-v2', '0');
+                }
+                // Clean up the old stale key so it doesn't cause confusion
+                if (stored !== null) localStorage.removeItem('sqlcanvas-dark');
+            } catch (_) {}
+        })();
+    </script>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,6 +76,78 @@
         }
     </script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- ── Service Worker: auto-update on every deploy, no hard-reload needed ── -->
+    <script>
+        (function () {
+            if (!('serviceWorker' in navigator)) return;
+
+            // Inline SW as a Blob — no separate sw.js file needed
+            const SW_VERSION = Date.now(); // bumped automatically on each page load/deploy
+            const swCode = `
+const CACHE = 'sqlcanvas-v' + ${SW_VERSION};
+self.addEventListener('install', e => {
+    // Skip waiting so the new SW activates immediately
+    self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+    e.waitUntil(
+        caches.keys().then(keys =>
+            Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+        ).then(() => self.clients.claim())
+    );
+});
+self.addEventListener('fetch', e => {
+    // Network-first for HTML (index.html), cache-first for everything else
+    const isHTML = e.request.mode === 'navigate' ||
+                   e.request.headers.get('accept')?.includes('text/html');
+    if (isHTML) {
+        e.respondWith(
+            fetch(e.request).then(res => {
+                const clone = res.clone();
+                caches.open(CACHE).then(c => c.put(e.request, clone));
+                return res;
+            }).catch(() => caches.match(e.request))
+        );
+    } else {
+        e.respondWith(
+            caches.match(e.request).then(cached => cached ||
+                fetch(e.request).then(res => {
+                    const clone = res.clone();
+                    caches.open(CACHE).then(c => c.put(e.request, clone));
+                    return res;
+                })
+            )
+        );
+    }
+});
+`;
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            const swUrl = URL.createObjectURL(blob);
+
+            navigator.serviceWorker.register(swUrl, { scope: './' })
+                .then(reg => {
+                    // If a new SW is waiting, activate it immediately
+                    if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    reg.addEventListener('updatefound', () => {
+                        const newSW = reg.installing;
+                        newSW?.addEventListener('statechange', () => {
+                            if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+                                // New version ready — reload silently
+                                window.location.reload();
+                            }
+                        });
+                    });
+                })
+                .catch(() => {}); // Silently fail if SW not supported (e.g. file://)
+
+            // Reload if the controller changes (new SW took over)
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!refreshing) { refreshing = true; window.location.reload(); }
+            });
+        })();
+    </script>
 
     <style>
         body { font-family: 'Inter', sans-serif; margin: 0; overflow: hidden; touch-action: none; }
@@ -1295,7 +1392,7 @@
             const [autoAlias,    setAutoAlias]    = useState(true);
             const [removeNL,     setRemoveNL]     = useState(false);
             const [isDark,       setIsDark]       = useState(() => {
-                try { return localStorage.getItem('sqlcanvas-dark') === '1'; } catch(_) { return false; }
+                try { return localStorage.getItem('sqlcanvas-dark-v2') === '1'; } catch(_) { return false; }
             });
             const [error,        setError]        = useState(null);
             const [splitPct,     setSplitPct]     = useState(50);
@@ -1449,15 +1546,37 @@
 
                 // ── Parser ──
                 function parseSQL(raw){
-                    const sql=raw.replace(/--[^\n]*/g,' ').replace(/\/\*[\s\S]*?\*\//g,' ');
+                    // Step 1: strip line and block comments
+                    let sql=raw.replace(/--[^\n]*/g,' ').replace(/\/\*[\s\S]*?\*\//g,' ');
+
+                    // Step 2: extract and inline dollar-quoted blocks ($$...$$  or $tag$...$tag$)
+                    // This handles CREATE OR REPLACE PROCEDURE / FUNCTION bodies in plpgsql
+                    sql = sql.replace(/\$([^$]*)\$([\s\S]*?)\$\1\$/g, (match, tag, body) => {
+                        // Unwrap the body so its SQL statements are visible to the parser
+                        return ' ' + body + ' ';
+                    });
+
+                    // Step 3: strip procedure/function DDL headers so they don't confuse the tokeniser
+                    // e.g. "CREATE OR REPLACE PROCEDURE schema.name(...) LANGUAGE plpgsql AS"
+                    sql = sql.replace(/CREATE\s+(?:OR\s+REPLACE\s+)?(?:PROCEDURE|FUNCTION)\s+[\w.$"]+\s*\([^)]*\)\s*(?:RETURNS\s+\S+\s*)?(?:LANGUAGE\s+\w+\s*)?(?:AS\s*)?/gi, ' ');
+
+                    // Step 4: strip bare LANGUAGE / SECURITY / VOLATILE / STABLE / STRICT clauses
+                    sql = sql.replace(/\b(?:LANGUAGE|SECURITY|VOLATILE|STABLE|STRICT|IMMUTABLE|CALLED\s+ON\s+NULL\s+INPUT|RETURNS\s+NULL\s+ON\s+NULL\s+INPUT)\b\s*\w*/gi, ' ');
+
+                    // Step 5: treat BEGIN...END as a transparent block (remove the keywords themselves)
+                    sql = sql.replace(/\bBEGIN\b/gi, ' ').replace(/\bEND\s*;/gi, ' ');
+
                     const nodesMap=new Map(); const edgesList=[];
+                    // Schemas whose tables are treated as control/audit nodes
+                    const CONTROL_SCHEMAS = new Set(['control','audit','meta','metadata','log','logs','config']);
                     function addNode(name,type){
                         let clean=name.replace(/["\[\]]/g,'');
                         let key=clean.toLowerCase().split('.').pop();
+                        let schema = clean.includes('.') ? clean.split('.')[0].toLowerCase() : '';
+                        // Auto-promote to control type if schema is a known control schema
+                        if(CONTROL_SCHEMAS.has(schema) && type === 'source') type = 'control';
                         if(!nodesMap.has(key)){
-                            let schema='';
-                            if(clean.includes('.')){schema=clean.split('.')[0];}
-                            else if(type==='source'||type==='target'){schema='public';}
+                            if(!schema && (type==='source'||type==='target')) schema='public';
                             nodesMap.set(key,{id:key,label:clean.includes('.')?clean.split('.').join('\n.'):clean,type,schema,col:0,meta:{}});
                         } else {
                             const ex=nodesMap.get(key);
@@ -1477,6 +1596,10 @@
                             let name=tokens[i+1];
                             if(name.toUpperCase()==='IF'&&i+4<tokens.length&&tokens[i+2].toUpperCase()==='NOT'&&tokens[i+3].toUpperCase()==='EXISTS')name=tokens[i+4];
                             if(name&&name.match(/^[a-zA-Z0-9_."#]+$/))addNode(name,'temp');
+                        } else if(t==='TABLE'&&i>=2&&tokens[i-1].toUpperCase()==='EXISTS'&&tokens[i-2].toUpperCase()==='IF'){
+                            // DROP TABLE IF EXISTS tmp_name — pre-register so it's never treated as a source
+                            const name=tokens[i+1];
+                            if(name&&name.match(/^[a-zA-Z0-9_."#]+$/)&&!nodesMap.has(name.toLowerCase()))addNode(name,'temp');
                         } else if(t==='INTO'&&i>0&&tokens[i-1].toUpperCase()==='INSERT'){
                             const name=tokens[i+1];
                             if(name&&name.match(/^[a-zA-Z0-9_."#]+$/))addNode(name,'target');
@@ -1506,7 +1629,9 @@
                             if(name&&name.match(/^[a-zA-Z0-9_."#]+$/)){currentTarget=addNode(name,'target');mainTarget=currentTarget;}
                         } else if(t==='UPDATE'){
                             const name=tokens[i+1];
-                            if(name&&name.match(/^[a-zA-Z0-9_."#]+$/)){currentTarget=addNode(name,'target');mainTarget=currentTarget;}
+                            if(name&&name.match(/^[a-zA-Z0-9_."#]+$/)){
+                                currentTarget=addNode(name,'target');mainTarget=currentTarget;
+                            }
                         } else if(t==='DELETE'&&i+2<tokens.length&&tokens[i+1].toUpperCase()==='FROM'){
                             const name=tokens[i+2];
                             if(name.match(/^[a-zA-Z0-9_."#]+$/)){currentTarget=addNode(name,'target');mainTarget=currentTarget;}
@@ -1515,9 +1640,13 @@
                         }
                         if(t==='FROM'||t==='JOIN'){
                             const src=tokens[i+1];
-                            const skip=!src||!src.match(/^[a-zA-Z0-9_."#]+$/)||['SELECT','WHERE','LATERAL'].includes(src.toUpperCase())||/^(v_|p_|l_)/i.test(src);
+                            // Skip: UPDATE x SET ... FROM src — the FROM here is a source join, not a target reset
+                            // Also skip DROP TABLE IF EXISTS, control keywords, subquery openers
+                            const skipWords = ['SELECT','WHERE','LATERAL','SET','EXISTS'];
+                            const skip=!src||!src.match(/^[a-zA-Z0-9_."#]+$/)||skipWords.includes(src.toUpperCase())||/^(v_|p_|l_)/i.test(src);
                             if(!skip){
                                 const sk=addNode(src,'source');
+                                // Don't draw an edge if src is the same table as current target (UPDATE...FROM self)
                                 if(currentTarget&&sk!==currentTarget&&!edgesList.find(e=>e.from===sk&&e.to===currentTarget)){
                                     edgesList.push({from:sk,to:currentTarget,label:t==='JOIN'?'JOIN':'FROM'});
                                 }
@@ -2182,7 +2311,7 @@
             // Apply dark mode class to <html>
             useEffect(() => {
                 document.documentElement.classList.toggle('dark', isDark);
-                try { localStorage.setItem('sqlcanvas-dark', isDark ? '1' : '0'); } catch(_) {}
+                try { localStorage.setItem('sqlcanvas-dark-v2', isDark ? '1' : '0'); } catch(_) {}
             }, [isDark]);
 
             // Keep activeTabRef in sync so non-reactive callbacks (runAllTabs etc.) can read it
