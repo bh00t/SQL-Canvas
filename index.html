@@ -3,7 +3,22 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SQL | SQL Minifier</title>
+    <title>SQL Canvas | Workspace</title>
+    <meta name="description" content="SQL Canvas — a free browser-based workspace for data engineers. Minify, beautify, shorten and format SQL online. Auto-alias tables, output single-line SQL, and visualise SQL data flow as an interactive diagram. Supports Redshift, PostgreSQL, MySQL, Snowflake, BigQuery. No install, no sign-up." />
+    <meta name="keywords" content="SQL minifier, SQL beautifier, SQL formatter, SQL beautify, SQL minify, SQL shortener, SQL shortner, shorten SQL, compress SQL, SQL compressor, auto alias SQL, SQL auto alias, table alias generator, single line SQL, SQL one liner, SQL one-liner, flatten SQL, SQL canvas, minify SQL online, beautify SQL online, format SQL online, SQL data flow, SQL lineage, SQL diagram, SQL visualiser, SQL flow diagram, SQL dependency diagram, data flow diagram, download data flow, download data diagram, data diagram, stored procedure flow, AWS Redshift data flow, AWS Redshift SQL, PostgreSQL formatter, MySQL data flow, SQL query data flow, data engineer tools, data engineer, DB tools, database tools, SQL tools, SQL, data science, data engineering, SQL online tool, free SQL tool, SQL workspace, SQL editor, SQL pipeline visualiser, CTE visualiser, SQL CTE diagram, SQL query optimiser, Redshift SQL formatter, BigQuery SQL formatter, Snowflake SQL formatter" />
+    <meta name="author" content="SQL Canvas" />
+    <!-- Google Search Console ownership verification — replace XXXX with your actual code from Search Console -->
+    <meta name="google-site-verification" content="PASTE_YOUR_CODE_HERE" />
+    <link rel="canonical" href="https://bh00t.github.io/SQL-Canvas/" />
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="SQL Canvas | Workspace" />
+    <meta property="og:description" content="Minify, beautify and visualise SQL data flow in your browser. No install, no sign-up." />
+    <meta property="og:url" content="https://bh00t.github.io/SQL-Canvas/" />
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="SQL Canvas | Workspace" />
+    <meta name="twitter:description" content="Minify, beautify and visualise SQL data flow in your browser." />
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -38,16 +53,42 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
-        body { font-family: 'Inter', sans-serif; margin: 0; overflow: hidden; }
+        body { font-family: 'Inter', sans-serif; margin: 0; overflow: hidden; touch-action: none; }
 
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar { width: 14px; height: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
-        ::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
-        .dark ::-webkit-scrollbar-thumb { background-color: #475569; }
-        .dark ::-webkit-scrollbar-thumb:hover { background-color: #64748b; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; border: 3px solid transparent; background-clip: content-box; min-height: 60px; }
+        ::-webkit-scrollbar-thumb:hover { background-color: #64748b; background-clip: content-box; }
+        ::-webkit-scrollbar-thumb:active { background-color: #475569; background-clip: content-box; }
+        .dark ::-webkit-scrollbar-thumb { background-color: #475569; background-clip: content-box; min-height: 60px; }
+        .dark ::-webkit-scrollbar-thumb:hover { background-color: #64748b; background-clip: content-box; }
+        .dark ::-webkit-scrollbar-thumb:active { background-color: #94a3b8; background-clip: content-box; }
 
         .font-fira { font-family: 'Fira Code', monospace; }
+
+        @keyframes progressBar {
+            0%   { width: 0%; opacity: 1; }
+            50%  { width: 70%; opacity: 1; }
+            80%  { width: 90%; opacity: 1; }
+            100% { width: 100%; opacity: 0; }
+        }
+        @keyframes detailSlideIn {
+            from { opacity: 0; transform: translateX(8px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        .ln-textarea:focus { outline: none; }
+        .ln-textarea::selection { background: rgba(59,130,246,0.18); }
+        .dark .ln-textarea::selection { background: rgba(59,130,246,0.28); }
+
+        /* Smooth tab content transitions */
+        .tab-content { transition: opacity 0.15s ease; }
+
+        /* Better checkbox styling */
+        input[type="checkbox"] { cursor: pointer; }
+
+        /* Subtle glow on active minify/beautify tabs */
+        .tab-active-blue { box-shadow: 0 0 0 1px rgba(59,130,246,0.1); }
 
         @keyframes statsReveal {
             from { opacity: 0; transform: translateY(-4px); }
@@ -57,61 +98,37 @@
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .fade-in { animation: fadeIn 0.2s ease-out forwards; }
+
+        /* Line-numbered editor */
+        .ln-editor { display: flex; flex: 1; overflow: hidden; min-height: 0; position: relative; }
+        .ln-gutter {
+            flex-shrink: 0; width: 48px;
+            background: #f8fafc; border-right: 1px solid #e2e8f0;
+            overflow: hidden; pointer-events: none; user-select: none;
+            padding: 16px 0;
+            font-family: 'Fira Code', monospace; font-size: 13px; line-height: 1.625rem;
+            color: #94a3b8; text-align: right;
+        }
+        .dark .ln-gutter { background: #0f172a; border-right-color: #1e293b; color: #475569; }
+        .ln-gutter span { display: block; padding-right: 10px; }
+        .ln-textarea {
+            flex: 1; resize: none; border: none; outline: none;
+            padding: 16px 16px 16px 12px;
+            font-family: 'Fira Code', monospace; font-size: 13px; line-height: 1.625rem;
+            color: #1e293b; background: transparent;
+            overflow-y: scroll; overflow-x: auto;
+            white-space: pre; tab-size: 2;
+        }
+        .dark .ln-textarea { color: #cbd5e1; }
+        .ln-textarea::placeholder { color: #94a3b8; }
+        .dark .ln-textarea::placeholder { color: #475569; }
     </style>
 </head>
 <body class="h-screen w-screen overflow-hidden bg-white dark:bg-slate-900">
     <div id="root" class="h-full w-full"></div>
 
-    <script type="text/babel" data-type="module">
-        import React, { useState, useRef, useEffect, useCallback } from 'react';
-        import { createRoot } from 'react-dom/client';
-        import {
-            FileUp, Download, Copy, Trash2, FileCode2, Check, Database,
-            Settings2, Activity, Moon, Sun, Code2, Play, Zap, Lightbulb, Wand2
-        } from 'lucide-react';
-
-        /* ── Tooltip component ── */
-        const Tooltip = ({ content, children, position = 'top', disabled = false }) => {
-          if (disabled || !content) return <>{children}</>;
-          const positions = {
-            top: 'bottom-full left-1/2 -translate-x-1/2 mb-2',
-            bottom: 'top-full left-1/2 -translate-x-1/2 mt-2',
-            left: 'right-full top-1/2 -translate-y-1/2 mr-2',
-            right: 'left-full top-1/2 -translate-y-1/2 ml-2',
-            'bottom-right': 'top-full right-0 mt-2',
-            'bottom-left': 'top-full left-0 mt-2',
-            'top-right': 'bottom-full right-0 mb-2',
-            'top-left': 'bottom-full left-0 mb-2'
-          };
-          return (
-            <div className="group relative inline-flex items-center justify-center">
-              {children}
-              <div className={`absolute ${positions[position]} px-2 py-1 bg-slate-900/75 dark:bg-slate-100/75 backdrop-blur-sm text-white dark:text-slate-900 text-[10px] md:text-xs font-medium rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-[100] pointer-events-none`}>
-                {content}
-              </div>
-            </div>
-          );
-        };
-
-        /* ── Reactive window width ── */
-        function useWindowWidth() {
-            const [w, setW] = useState(window.innerWidth);
-            useEffect(() => {
-                const h = () => setW(window.innerWidth);
-                window.addEventListener('resize', h);
-                return () => window.removeEventListener('resize', h);
-            }, []);
-            return w;
-        }
-
-        /* ── Format bytes ── */
-        function formatBytes(bytes) {
-            if (!bytes || bytes === 0) return '0 B';
-            const k = 1024, s = ['B','KB','MB','GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + s[i];
-        }
-
+    <!-- Move Engine Functions Outside Babel to avoid transpilation helper injections into Web Workers -->
+    <script>
         /* ══════════════════════════════════════════════════════════════════════
            TWO-PASS AST-DRIVEN SQL MINIFICATION ENGINE
         ══════════════════════════════════════════════════════════════════════ */
@@ -488,7 +505,7 @@
                     toks.push({k:'NUM', v:n}); continue;
                 }
                 // two-char operators
-                if ((ch === '<' || ch === '>' || ch === '!' || ch === '<' || ch === '>') && /[=<>]/.test(sql[i+1])) {
+                if ((ch === '<' || ch === '>' || ch === '!') && /[=<>]/.test(sql[i+1])) {
                     toks.push({k:'OP', v:ch+sql[i+1]}); i += 2; continue;
                 }
                 toks.push({k:'OP', v:ch}); i++;
@@ -551,7 +568,7 @@
                 for (const [p, c] of [[p4,4],[p3,3],[p2,2],[p1,1]]) {
                     if (!p) continue;
                     if (TOP.has(p)||JOINS.has(p)||DML.has(p)||SUB.has(p)||CASE_KW.has(p)||CLAUSE_NODENT.has(p)||
-                        p==='group by'||p==='order by'||p==='partition by'||p==='order by'||p==='as'||
+                        p==='group by'||p==='order by'||p==='partition by'||p==='as'||
                         p==='insert into'||p==='delete from'||p==='create or replace'||
                         p==='left join'||p==='right join'||p==='full join'||p==='inner join'||
                         p==='left outer join'||p==='right outer join'||p==='full outer join'||
@@ -1157,6 +1174,57 @@
 
             return result;
         }
+    </script>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState, useRef, useEffect, useCallback } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import {
+            FileUp, Download, Copy, Trash2, FileCode2, Check, Database,
+            Settings2, Activity, Moon, Sun, Code2, Play, Zap, Lightbulb, Wand2
+        } from 'lucide-react';
+
+        /* ── Tooltip component ── */
+        const Tooltip = ({ content, children, position = 'top', disabled = false }) => {
+          if (disabled || !content) return <>{children}</>;
+          const positions = {
+            top: 'bottom-full left-1/2 -translate-x-1/2 mb-2',
+            bottom: 'top-full left-1/2 -translate-x-1/2 mt-2',
+            left: 'right-full top-1/2 -translate-y-1/2 mr-2',
+            right: 'left-full top-1/2 -translate-y-1/2 ml-2',
+            'bottom-right': 'top-full right-0 mt-2',
+            'bottom-left': 'top-full left-0 mt-2',
+            'top-right': 'bottom-full right-0 mb-2',
+            'top-left': 'bottom-full left-0 mb-2'
+          };
+          return (
+            <div className="group relative inline-flex items-center justify-center">
+              {children}
+              <div className={`absolute ${positions[position]} px-2 py-1 bg-slate-900/75 dark:bg-slate-100/75 backdrop-blur-sm text-white dark:text-slate-900 text-[10px] md:text-xs font-medium rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-[100] pointer-events-none`}>
+                {content}
+              </div>
+            </div>
+          );
+        };
+
+        /* ── Reactive window width ── */
+        function useWindowWidth() {
+            const [w, setW] = useState(window.innerWidth);
+            useEffect(() => {
+                const h = () => setW(window.innerWidth);
+                window.addEventListener('resize', h);
+                return () => window.removeEventListener('resize', h);
+            }, []);
+            return w;
+        }
+
+        /* ── Format bytes ── */
+        function formatBytes(bytes) {
+            if (!bytes || bytes === 0) return '0 B';
+            const k = 1024, s = ['B','KB','MB','GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + s[i];
+        }
 
         /* ══════════════════════════════════════════════════════════════════════
            LIGHTWEIGHT SQL SYNTAX HIGHLIGHTER
@@ -1226,23 +1294,902 @@
             const [stats,        setStats]        = useState(null);
             const [autoAlias,    setAutoAlias]    = useState(true);
             const [removeNL,     setRemoveNL]     = useState(false);
-            const [isDark,       setIsDark]       = useState(false);
+            const [isDark,       setIsDark]       = useState(() => {
+                try { return localStorage.getItem('sqlcanvas-dark') === '1'; } catch(_) { return false; }
+            });
             const [error,        setError]        = useState(null);
             const [splitPct,     setSplitPct]     = useState(50);
             const [isDragging,   setIsDragging]   = useState(false);
             const [isDragOver,   setIsDragOver]   = useState(false);
             const [showReport,   setShowReport]   = useState(false);
             const [mode,         setMode]         = useState('minify'); // 'minify' | 'beautify'
+            const modeRef = useRef('minify'); // always current — avoids stale-closure guard in handleModeSwitch
+            const [activeTab,    setActiveTab]    = useState('editor'); // 'editor' | 'dataflow'
+            const [dfStatus,     setDfStatus]     = useState({text:'',err:false,n:0,e:0});
+            const [dfEmpty,      setDfEmpty]      = useState(true);
+            const [dfUndoState,  setDfUndoState]  = useState({u:false,r:false});
+            const [dfPanActive,  setDfPanActive]  = useState(false);
+            const [dfNodeDetail, setDfNodeDetail] = useState(null); // {node, ins, outs} or null
+            const canvasRef      = useRef(null);
+            const dfCanvasRef    = useRef(null);
+            const prevSplitPct   = useRef(50); // remembers user's split before entering dataflow
+            const userAdjustedSplit = useRef(false); // true once user manually drags the divider
+            const activeTabRef = useRef('editor'); // mirrors activeTab for use inside callbacks
 
             const windowWidth = useWindowWidth();
             const isDesktop   = windowWidth >= 1024;
             const containerRef = useRef(null);
             const fileInputRef = useRef(null);
+            const gutterRef    = useRef(null);
+            const dfCanvasElRef   = useRef(null);  // the <canvas> DOM element
+            const dfMmCanvasRef   = useRef(null);  // minimap canvas
+            const dfEngineRef     = useRef(null);  // engine instance (imperative)
+            const dfZoomPctRef    = useRef(null);  // zoom label el ref
+
+            // ── Data-Flow Canvas Engine (imperative, mounted once, persists across tab switches) ──
+            useEffect(() => {
+                // Wait until both canvas elements exist in DOM (they're always mounted, just hidden)
+                const tryInit = () => {
+                    const cv   = dfCanvasElRef.current;
+                    const mmCv = dfMmCanvasRef.current;
+                    const cwEl = cv?.parentElement;
+                    if (!cv || !mmCv || !cwEl) return;
+
+                // ── Theme ──
+                const TH = {
+                    source:   {bg:'#f0f6fb',border:'#0078d4',stripe:'#0078d4',iconBg:'#deecf9',label:'BASE TABLE', icon:'⊞'},
+                    temp:     {bg:'#fef5ef',border:'#ca5010',stripe:'#ca5010',iconBg:'#fce4d6',label:'TEMP TABLE', icon:'⚙'},
+                    transform:{bg:'#f4effc',border:'#5c2d91',stripe:'#5c2d91',iconBg:'#ede4f5',label:'CTE',        icon:'◈'},
+                    target:   {bg:'#edf7ed',border:'#107c10',stripe:'#107c10',iconBg:'#dff6dd',label:'TARGET',     icon:'▤'},
+                    control:  {bg:'#edf6f5',border:'#008272',stripe:'#008272',iconBg:'#d2f0ed',label:'CONTROL',    icon:'◎'},
+                };
+                const _rgb={};
+                function h2rgb(h){if(_rgb[h])return _rgb[h];const v=[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];_rgb[h]=v;return v;}
+                Object.values(TH).forEach(t=>{h2rgb(t.border);});
+
+                const ctx2d = cv.getContext('2d',{alpha:false});
+                const NW=192,NH=72;
+                const MM_W=160,MM_H=110;
+                mmCv.width=MM_W; mmCv.height=MM_H;
+                const mmCtx=mmCv.getContext('2d');
+
+                let nodes=[],edges=[],groups=[],nodeMap={};
+                let vp={x:0,y:0,scale:1};
+                let hov=null,sel=null,dragNode=null,dragNodeOffset={x:0,y:0};
+                // ── Node tooltip ──
+                let _tipEl=null;
+                function ensureTip(){
+                    if(_tipEl)return _tipEl;
+                    _tipEl=document.createElement('div');
+                    _tipEl.style.cssText='position:fixed;z-index:9999;pointer-events:none;display:none;background:#1e293b;color:#f1f5f9;font-size:12px;font-family:Consolas,monospace;padding:5px 10px;border-radius:5px;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.08);transition:opacity .1s';
+                    document.body.appendChild(_tipEl);
+                    return _tipEl;
+                }
+                function showTip(node,clientX,clientY){
+                    const tip=ensureTip();
+                    const fullName=node.schema?node.schema+'.'+node.label.replace(/\n/g,'').trim():node.label.replace(/\n/g,'').trim();
+                    tip.textContent=fullName;
+                    tip.style.display='block';
+                    tip.style.opacity='1';
+                    positionTip(clientX,clientY);
+                }
+                function positionTip(clientX,clientY){
+                    const tip=ensureTip();
+                    const ox=14,oy=-36;
+                    let x=clientX+ox,y=clientY+oy;
+                    const tw=tip.offsetWidth,th=tip.offsetHeight;
+                    if(x+tw>window.innerWidth-8)x=clientX-tw-ox;
+                    if(y<8)y=clientY+16;
+                    tip.style.left=x+'px';tip.style.top=y+'px';
+                }
+                function hideTip(){
+                    if(_tipEl){_tipEl.style.display='none';}
+                }
+                let panDrag=false,panMode=false,didMove=false;
+                let dragStart=null,vpStart=null;
+                let _rafPending=false,_minimapDirty=false;
+                let hovChain=null;
+                let rubberBand=null,selGroup=new Set(),groupDrag=false,groupDragStart=null,groupDragOffsets=[];
+                let undoStack=[],redoStack=[];
+                let nodeDefaults={};
+                let _dotPatternCache=null,_dotPatternScale=-1;
+
+                function scheduleRender(withMm){if(withMm)_minimapDirty=true;if(_rafPending)return;_rafPending=true;requestAnimationFrame(_doRender);}
+                function render(){scheduleRender(true);}
+
+                function w2s(wx,wy){return{x:wx*vp.scale+vp.x+cv.width/2,y:wy*vp.scale+vp.y+cv.height/2};}
+                function s2w(sx,sy){return{x:(sx-cv.width/2-vp.x)/vp.scale,y:(sy-cv.height/2-vp.y)/vp.scale};}
+
+                let _wasZero = false; // Tracks if canvas was hidden previously
+                let _everFit = false; // True once nodes have been fit at least once for current data
+                function resize(){
+                    const r=cwEl.getBoundingClientRect();
+                    const oldWidth = cv.width;
+                    cv.width=r.width; cv.height=r.height;
+                    ctx2d.fillStyle='#ffffff'; ctx2d.fillRect(0,0,cv.width,cv.height);
+
+                    // Fit whenever new data arrived (_everFit=false) and canvas has real dimensions.
+                    // This handles both: tab becoming visible, and layout changing (split resize).
+                    if(cv.width > 0 && cv.height > 0 && nodes.length && !_everFit){
+                        _everFit = true;
+                        fitView();
+                    }
+                }
+
+                function rr(x,y,w,h,r){
+                    ctx2d.beginPath();
+                    ctx2d.moveTo(x+r,y);ctx2d.lineTo(x+w-r,y);ctx2d.quadraticCurveTo(x+w,y,x+w,y+r);
+                    ctx2d.lineTo(x+w,y+h-r);ctx2d.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+                    ctx2d.lineTo(x+r,y+h);ctx2d.quadraticCurveTo(x,y+h,x,y+h-r);
+                    ctx2d.lineTo(x,y+r);ctx2d.quadraticCurveTo(x,y,x+r,y);
+                    ctx2d.closePath();
+                }
+
+                function updZ(){if(dfZoomPctRef.current)dfZoomPctRef.current.textContent=Math.round(vp.scale*100)+'%';}
+                function doZoom(f,mx,my){
+                    if(mx===undefined){mx=cv.width/2;my=cv.height/2;}
+                    const b=s2w(mx,my);
+                    vp.scale=Math.max(.06,Math.min(3,vp.scale*f));
+                    const a=s2w(mx,my);
+                    vp.x+=(a.x-b.x)*vp.scale; vp.y+=(a.y-b.y)*vp.scale;
+                    updZ(); render();
+                }
+                function fitView(){
+                    if(!nodes.length)return;
+                    const pad=48;
+                    // Safegaurd against 0x0 size when canvas container is hidden
+                    const cw = Math.max(cv.width, 400);
+                    const ch = Math.max(cv.height, 300);
+                    const mnx=Math.min(...nodes.map(n=>n.x-n.w/2)),mxx=Math.max(...nodes.map(n=>n.x+n.w/2));
+                    const mny=Math.min(...nodes.map(n=>n.y-n.h/2)),mxy=Math.max(...nodes.map(n=>n.y+n.h/2));
+                    const sc=Math.min((cw-pad*2)/(mxx-mnx||1),(ch-pad*2)/(mxy-mny||1),1.5);
+                    vp.scale=Math.max(0.06, sc); vp.x=-((mnx+mxx)/2)*vp.scale; vp.y=-((mny+mxy)/2)*vp.scale;
+                    updZ(); render();
+                }
+
+                // ── Parser ──
+                function parseSQL(raw){
+                    const sql=raw.replace(/--[^\n]*/g,' ').replace(/\/\*[\s\S]*?\*\//g,' ');
+                    const nodesMap=new Map(); const edgesList=[];
+                    function addNode(name,type){
+                        let clean=name.replace(/["\[\]]/g,'');
+                        let key=clean.toLowerCase().split('.').pop();
+                        if(!nodesMap.has(key)){
+                            let schema='';
+                            if(clean.includes('.')){schema=clean.split('.')[0];}
+                            else if(type==='source'||type==='target'){schema='public';}
+                            nodesMap.set(key,{id:key,label:clean.includes('.')?clean.split('.').join('\n.'):clean,type,schema,col:0,meta:{}});
+                        } else {
+                            const ex=nodesMap.get(key);
+                            if(ex.type==='source'&&type!=='source'){ex.type=type;if(!clean.includes('.'))ex.schema='';}
+                        }
+                        return key;
+                    }
+                    const tokens=sql.split(/([\s(),;])/).map(t=>t.trim()).filter(t=>t.length>0);
+                    let currentTarget=null,mainTarget=null,parenDepth=0;
+                    // Pass 1: register targets
+                    for(let i=0;i<tokens.length;i++){
+                        let t=tokens[i].toUpperCase();
+                        if((t==='WITH'||t===',')&&i+3<tokens.length&&tokens[i+2].toUpperCase()==='AS'&&tokens[i+3]==='('){
+                            const name=tokens[i+1];
+                            if(name.toUpperCase()!=='SELECT'&&name.toUpperCase()!=='INSERT'&&name.match(/^[a-zA-Z0-9_."#]+$/))addNode(name,'transform');
+                        } else if(t==='TABLE'&&i>0&&(tokens[i-1].toUpperCase()==='TEMP'||tokens[i-1].toUpperCase()==='TEMPORARY')){
+                            let name=tokens[i+1];
+                            if(name.toUpperCase()==='IF'&&i+4<tokens.length&&tokens[i+2].toUpperCase()==='NOT'&&tokens[i+3].toUpperCase()==='EXISTS')name=tokens[i+4];
+                            if(name&&name.match(/^[a-zA-Z0-9_."#]+$/))addNode(name,'temp');
+                        } else if(t==='INTO'&&i>0&&tokens[i-1].toUpperCase()==='INSERT'){
+                            const name=tokens[i+1];
+                            if(name&&name.match(/^[a-zA-Z0-9_."#]+$/))addNode(name,'target');
+                        } else if(t==='UPDATE'){
+                            const name=tokens[i+1];
+                            if(name&&name.match(/^[a-zA-Z0-9_."#]+$/))addNode(name,'target');
+                        } else if(t==='DELETE'&&i+2<tokens.length&&tokens[i+1].toUpperCase()==='FROM'){
+                            const name=tokens[i+2];
+                            if(name.match(/^[a-zA-Z0-9_."#]+$/))addNode(name,'target');
+                        }
+                    }
+                    // Pass 2: dependencies
+                    for(let i=0;i<tokens.length;i++){
+                        let t=tokens[i].toUpperCase();
+                        if(t==='(')parenDepth++;
+                        if(t===')')parenDepth--;
+                        if(t===';'){currentTarget=null;mainTarget=null;parenDepth=0;}
+                        if((t==='WITH'||t===',')&&i+3<tokens.length&&tokens[i+2].toUpperCase()==='AS'&&tokens[i+3]==='('){
+                            const name=tokens[i+1];
+                            if(name.toUpperCase()!=='SELECT'&&name.toUpperCase()!=='INSERT'&&name.match(/^[a-zA-Z0-9_."#]+$/))currentTarget=addNode(name,'transform');
+                        } else if(t==='TABLE'&&i>0&&(tokens[i-1].toUpperCase()==='TEMP'||tokens[i-1].toUpperCase()==='TEMPORARY')){
+                            let name=tokens[i+1];
+                            if(name.toUpperCase()==='IF'&&i+4<tokens.length&&tokens[i+2].toUpperCase()==='NOT'&&tokens[i+3].toUpperCase()==='EXISTS')name=tokens[i+4];
+                            if(name&&name.match(/^[a-zA-Z0-9_."#]+$/)){currentTarget=addNode(name,'temp');mainTarget=currentTarget;}
+                        } else if(t==='INTO'&&i>0&&tokens[i-1].toUpperCase()==='INSERT'){
+                            const name=tokens[i+1];
+                            if(name&&name.match(/^[a-zA-Z0-9_."#]+$/)){currentTarget=addNode(name,'target');mainTarget=currentTarget;}
+                        } else if(t==='UPDATE'){
+                            const name=tokens[i+1];
+                            if(name&&name.match(/^[a-zA-Z0-9_."#]+$/)){currentTarget=addNode(name,'target');mainTarget=currentTarget;}
+                        } else if(t==='DELETE'&&i+2<tokens.length&&tokens[i+1].toUpperCase()==='FROM'){
+                            const name=tokens[i+2];
+                            if(name.match(/^[a-zA-Z0-9_."#]+$/)){currentTarget=addNode(name,'target');mainTarget=currentTarget;}
+                        } else if(t==='SELECT'&&parenDepth===0){
+                            if(mainTarget!==null)currentTarget=mainTarget;
+                        }
+                        if(t==='FROM'||t==='JOIN'){
+                            const src=tokens[i+1];
+                            const skip=!src||!src.match(/^[a-zA-Z0-9_."#]+$/)||['SELECT','WHERE','LATERAL'].includes(src.toUpperCase())||/^(v_|p_|l_)/i.test(src);
+                            if(!skip){
+                                const sk=addNode(src,'source');
+                                if(currentTarget&&sk!==currentTarget&&!edgesList.find(e=>e.from===sk&&e.to===currentTarget)){
+                                    edgesList.push({from:sk,to:currentTarget,label:t==='JOIN'?'JOIN':'FROM'});
+                                }
+                            }
+                        }
+                    }
+                    return{nodes:Array.from(nodesMap.values()),edges:edgesList};
+                }
+
+                // ── Level assignment ──
+                // ── Off-screen canvas for text measurement ──
+                const _measureCanvas = document.createElement('canvas');
+                const _mctx = _measureCanvas.getContext('2d');
+
+                function wrapText(text, maxPx, font){
+                    _mctx.font = font;
+                    if(_mctx.measureText(text).width <= maxPx) return [text];
+                    const separatorRe = /([-_.\s])/;
+                    const tokens = text.split(separatorRe).filter(Boolean);
+                    const lines = [];
+                    let cur = '';
+                    for(const tok of tokens){
+                        const test = cur + tok;
+                        if(cur && _mctx.measureText(test).width > maxPx && tok.trim()){
+                            if(cur.trim()) lines.push(cur.trimEnd());
+                            cur = tok.trimStart();
+                        } else {
+                            cur = test;
+                        }
+                    }
+                    if(cur.trim()) lines.push(cur.trim());
+                    const result = [];
+                    for(const line of lines){
+                        _mctx.font = font;
+                        if(_mctx.measureText(line).width <= maxPx){ result.push(line); continue; }
+                        let l='';
+                        for(const ch of line){
+                            if(_mctx.measureText(l+ch).width > maxPx && l){ result.push(l); l=ch; }
+                            else l+=ch;
+                        }
+                        if(l) result.push(l);
+                    }
+                    return result.length ? result : [text];
+                }
+
+                function computeNodeSize(n){
+                    // Node dimensions are fixed for canvas display
+                    // _nameLines/_schemaLines are computed only for PNG export text rendering
+                    const PAD_L=16, PAD_R=12, STRIPE=4;
+                    const NAME_FS=13, SCHEMA_FS=11;
+                    const rawLabel=n.label.replace(/\n/g,' ').trim();
+                    const tableName=rawLabel.includes('.')?rawLabel.split('.').pop():rawLabel;
+                    const nameFontStr=`600 ${NAME_FS}px Segoe UI,sans-serif`;
+                    const schemaFontStr=`400 ${SCHEMA_FS}px Segoe UI,sans-serif`;
+                    const innerW=NW-STRIPE-PAD_L-PAD_R;
+                    // Compute wrapped lines for PNG export only
+                    n._nameLines=wrapText(tableName,innerW,nameFontStr);
+                    n._schemaLines=n.schema?wrapText(n.schema,innerW,schemaFontStr):[];
+                    // Canvas always uses fixed size
+                    n.w=NW;
+                    n.h=NH;
+                }
+
+                function assignLevels(nodesList,edgesList){
+                    const nm={};nodesList.forEach(n=>{nm[n.id]=n;});
+                    let inDeg={},adj={},radj={};
+                    nodesList.forEach(n=>{inDeg[n.id]=0;adj[n.id]=[];radj[n.id]=[];});
+                    edgesList.forEach(e=>{if(inDeg[e.to]!==undefined)inDeg[e.to]++;if(adj[e.from])adj[e.from].push(e.to);if(radj[e.to])radj[e.to].push(e.from);});
+                    nodesList.forEach(n=>{n.col=inDeg[n.id]===0?0:-1;});
+                    const q=[];nodesList.forEach(n=>{if(n.col===0)q.push(n.id);});
+                    while(q.length){const u=q.shift(),un=nm[u];adj[u].forEach(v=>{const vn=nm[v];if(!vn)return;if(vn.col<un.col+1)vn.col=un.col+1;inDeg[v]--;if(inDeg[v]===0)q.push(v);});}
+                    nodesList.forEach(n=>{if(n.col===-1)n.col=1;});
+                    nodesList.forEach(n=>{if(radj[n.id].length===0&&adj[n.id].length>0){const tc=adj[n.id].map(tid=>nm[tid]?nm[tid].col:0);const mc=Math.min(...tc);if(mc>1)n.col=mc-1;}});
+                    const uc=[...new Set(nodesList.map(n=>n.col))].sort((a,b)=>a-b);
+                    const cr={};uc.forEach((c,i)=>cr[c]=i);
+                    nodesList.forEach(n=>{n.col=cr[n.col];});
+                    nodesList.forEach(n=>{n.w=NW;n.h=NH;n.x=0;n.y=0;});
+                    nodesList.forEach(n=>computeNodeSize(n));
+                }
+
+                // ── Layout ──
+                function schemaGroupLayout(){
+                    const NODE_H=NH+52;
+                    const BASE_COL_W=NW+140;
+                    const MIN_COL_GAP=50;
+                    const byCol={};
+                    nodes.forEach(n=>{(byCol[n.col]=byCol[n.col]||[]).push(n);});
+                    const colKeys=Object.keys(byCol).map(Number).sort((a,b)=>a-b);
+                    const colH={};colKeys.forEach(col=>{const ns=byCol[col];colH[col]=ns.length*NODE_H+Math.max(0,ns.length-1)*4;});
+                    const colBulge={};colKeys.forEach(col=>{const N=byCol[col].length;colBulge[col]=N>2?N*13:0;});
+                    const colX={};colX[colKeys[0]]=colBulge[colKeys[0]];
+                    for(let i=1;i<colKeys.length;i++){const prev=colKeys[i-1],cur=colKeys[i];const maxH=Math.max(colH[prev],colH[cur]);const gap=BASE_COL_W+Math.max(0,(maxH-300)*0.15)+MIN_COL_GAP+colBulge[cur];colX[cur]=colX[prev]+gap;}
+                    const xs=colKeys.map(c=>colX[c]);const midX=(Math.min(...xs)+Math.max(...xs))/2;colKeys.forEach(col=>{colX[col]-=midX;});
+                    colKeys.forEach(col=>{
+                        const ns=byCol[col],N=ns.length,mb=colBulge[col],cx=colX[col],tot=colH[col];
+                        let curY=-tot/2;
+                        ns.forEach((nd,i)=>{const t=N>1?(i/(N-1))*2-1:0;nd.x=cx-mb*Math.sqrt(1-t*t);nd.y=curY;curY+=NODE_H+4;});
+                    });
+                    colKeys.forEach(col=>{
+                        const ns=byCol[col];if(ns.length<2)return;
+                        ns.forEach(nd=>{
+                            const ys=[];
+                            edges.forEach(e=>{if(e.from===nd.id){const t=nodeMap[e.to];if(t&&t.col!==col)ys.push(t.y);}if(e.to===nd.id){const f=nodeMap[e.from];if(f&&f.col!==col)ys.push(f.y);}});
+                            nd._grav=ys.length?ys.reduce((a,b)=>a+b,0)/ys.length:nd.y;
+                        });
+                        ns.sort((a,b)=>a._grav-b._grav);
+                        const tot=colH[col],N=ns.length,mb=colBulge[col],cx=colX[col];
+                        let curY=-tot/2;
+                        ns.forEach((nd,i)=>{const t=N>1?(i/(N-1))*2-1:0;nd.x=cx-mb*Math.sqrt(1-t*t);nd.y=curY;curY+=NODE_H+4;});
+                    });
+                    for(let pass=0;pass<10;pass++){
+                        const order=pass%2===0?[...colKeys]:[...colKeys].reverse();
+                        order.forEach(col=>{
+                            const ns=byCol[col],N=ns.length;
+                            const pull=N===1?0.55:N<=2?0.62:N<=4?0.38:N<=7?0.2:0.1;
+                            ns.forEach(nd=>{
+                                const ys=[];
+                                edges.forEach(e=>{if(e.from===nd.id){const t=nodeMap[e.to];if(t&&t.col!==col){ys.push(t.y);ys.push(t.y);}}if(e.to===nd.id){const f=nodeMap[e.from];if(f&&f.col!==col)ys.push(f.y);}});
+                                if(ys.length){const tgt=ys.reduce((a,b)=>a+b,0)/ys.length;nd.y=nd.y*(1-pull)+tgt*pull;}
+                            });
+                            if(N>1){
+                                ns.sort((a,b)=>a.y-b.y);
+                                for(let i=1;i<N;i++){if(ns[i].y-ns[i-1].y<NODE_H+10)ns[i].y=ns[i-1].y+NODE_H+10;}
+                                const mean=ns.reduce((s,n)=>s+n.y,0)/N;ns.forEach(nd=>{nd.y-=mean*0.15;});
+                            }
+                        });
+                    }
+                    colKeys.forEach(col=>{
+                        const ns=byCol[col],N=ns.length,mb=colBulge[col],cx=colX[col];
+                        ns.sort((a,b)=>a.y-b.y);
+                        ns.forEach((nd,i)=>{const t=N>1?(i/(N-1))*2-1:0;nd.x=cx-mb*Math.sqrt(1-t*t);});
+                    });
+                    groups=[];
+                    colKeys.forEach(col=>{
+                        const ns=byCol[col],bySchema={};
+                        ns.forEach(n=>{const s=n.schema||'_other';(bySchema[s]=bySchema[s]||[]).push(n);});
+                        Object.entries(bySchema).forEach(([schema,gn])=>{
+                            if(!schema||schema==='_other')return;
+                            const ys=gn.map(n=>n.y);
+                            groups.push({schema,type:gn[0].type,x:Math.min(...gn.map(n=>n.x))-10,y:Math.min(...ys)-8,w:NW+20+colBulge[col],h:Math.max(...ys)+NH+8-(Math.min(...ys)-8)+20,col});
+                        });
+                    });
+                }
+
+                // ── Port / edge helpers ──
+                function getPort(node,side,tx,ty){
+                    const s=w2s(node.x-node.w/2,node.y-node.h/2);
+                    const sw=node.w*vp.scale,sh=node.h*vp.scale;
+                    const cx=s.x+sw/2,cy=s.y+sh/2;
+                    if(tx===undefined){
+                        if(side==='right')return{x:s.x+sw,y:cy};
+                        if(side==='left')return{x:s.x,y:cy};
+                        if(side==='bottom')return{x:cx,y:s.y+sh};
+                        if(side==='top')return{x:cx,y:s.y};
+                        return{x:cx,y:cy};
+                    }
+                    const SLIDE=0.62,MARGIN=sw*0.12;
+                    if(side==='right'||side==='left'){const ex=side==='right'?s.x+sw:s.x;const raw=cy+(ty-cy)*SLIDE;return{x:ex,y:Math.max(s.y+MARGIN,Math.min(s.y+sh-MARGIN,raw))};}
+                    if(side==='top'||side==='bottom'){const ey=side==='bottom'?s.y+sh:s.y;const raw=cx+(tx-cx)*SLIDE;return{x:Math.max(s.x+MARGIN,Math.min(s.x+sw-MARGIN,raw)),y:ey};}
+                    return{x:cx,y:cy};
+                }
+                function getBestPorts(fn,tn){
+                    const dx=tn.x-fn.x,dy=tn.y-fn.y,adx=Math.abs(dx),ady=Math.abs(dy);
+                    const ratio=adx>1?ady/adx:Infinity;
+                    let fromSide,toSide;
+                    if(ratio<0.55){if(dx>=0){fromSide='right';toSide='left';}else{fromSide=dy>=0?'bottom':'top';toSide=dy>=0?'top':'bottom';}}
+                    else if(ratio>1.8){fromSide=dy>=0?'bottom':'top';toSide=dy>=0?'top':'bottom';}
+                    else{if(dx>=0){fromSide='right';toSide='left';if(ady>adx*1.2){fromSide=dy>=0?'bottom':'top';toSide=dy>=0?'top':'bottom';}}else{fromSide=dy>=0?'bottom':'top';toSide=dy>=0?'top':'bottom';}}
+                    return{fromSide,toSide};
+                }
+                function getBezier(fp,tp,fs,ts){
+                    const dist=Math.sqrt((tp.x-fp.x)**2+(tp.y-fp.y)**2);
+                    const vert=fs==='top'||fs==='bottom';
+                    const bend=Math.min(Math.max(dist*(vert?0.38:0.44),50*vp.scale),280*vp.scale);
+                    const tang={right:{x:1,y:0},left:{x:-1,y:0},bottom:{x:0,y:1},top:{x:0,y:-1}};
+                    const ft=tang[fs],tt=tang[ts];
+                    return{cp1x:fp.x+ft.x*bend,cp1y:fp.y+ft.y*bend,cp2x:tp.x+tt.x*bend,cp2y:tp.y+tt.y*bend};
+                }
+                function isEdgeVisible(fp,tp){
+                    const W=cv.width,H=cv.height;
+                    return Math.max(fp.x,tp.x)>=0&&Math.min(fp.x,tp.x)<=W&&Math.max(fp.y,tp.y)>=0&&Math.min(fp.y,tp.y)<=H;
+                }
+                function drawArrow(tip,ang,color){
+                    const L=10,W2=5,px=Math.sin(ang)*W2,py=-Math.cos(ang)*W2;
+                    ctx2d.beginPath();ctx2d.moveTo(tip.x,tip.y);
+                    ctx2d.lineTo(tip.x-L*Math.cos(ang)+px,tip.y-L*Math.sin(ang)+py);
+                    ctx2d.lineTo(tip.x-L*Math.cos(ang)-px,tip.y-L*Math.sin(ang)-py);
+                    ctx2d.closePath();ctx2d.fillStyle=color;ctx2d.fill();
+                }
+
+                // ── Draw functions ──
+                function drawBackground(){
+                    ctx2d.fillStyle='#ffffff';ctx2d.fillRect(0,0,cv.width,cv.height);
+                    if(!nodes.length)return;
+                    const base=24;let sp2=base*vp.scale;
+                    while(sp2<10)sp2*=2;while(sp2>48)sp2/=2;
+                    const sk=Math.round(sp2*4)/4;
+                    if(_dotPatternScale!==sk){
+                        _dotPatternScale=sk;
+                        const sz=Math.round(sp2),pc=document.createElement('canvas');
+                        pc.width=sz;pc.height=sz;
+                        const px=pc.getContext('2d');
+                        px.fillStyle='#dbd9d7';px.beginPath();px.arc(sz/2,sz/2,1.1,0,Math.PI*2);px.fill();
+                        _dotPatternCache=ctx2d.createPattern(pc,'repeat');
+                    }
+                    const ox=((vp.x+cv.width/2)%sp2+sp2)%sp2;
+                    const oy=((vp.y+cv.height/2)%sp2+sp2)%sp2;
+                    ctx2d.save();ctx2d.translate(ox-sp2/2,oy-sp2/2);
+                    ctx2d.fillStyle=_dotPatternCache;
+                    ctx2d.fillRect(-sp2,-sp2,cv.width+sp2*2,cv.height+sp2*2);
+                    ctx2d.restore();
+                }
+
+                function drawNode(n){
+                    const s=w2s(n.x-n.w/2,n.y-n.h/2);
+                    const sw=n.w*vp.scale,sh=n.h*vp.scale;
+                    if(s.x+sw<0||s.x>cv.width||s.y+sh<0||s.y>cv.height)return;
+                    const th=TH[n.type]||TH.source;
+                    const isHov=hov&&hov.id===n.id,isSel=sel&&sel.id===n.id,active=isHov||isSel;
+                    const [rb,gb,bb]=h2rgb(th.border);
+                    // Shadow + background
+                    ctx2d.save();ctx2d.shadowColor=active?`rgba(${rb},${gb},${bb},.22)`:'rgba(0,0,0,.09)';ctx2d.shadowBlur=active?16:6;ctx2d.shadowOffsetY=active?3:1.5;
+                    ctx2d.fillStyle='#fff';rr(s.x,s.y,sw,sh,4);ctx2d.fill();ctx2d.restore();
+                    ctx2d.fillStyle=active?th.bg:'#fff';rr(s.x,s.y,sw,sh,4);ctx2d.fill();
+                    ctx2d.strokeStyle=active?th.border:`rgba(${rb},${gb},${bb},.28)`;ctx2d.lineWidth=active?1.8:1;rr(s.x,s.y,sw,sh,4);ctx2d.stroke();
+                    // Left colour stripe
+                    const stW=4*vp.scale;
+                    ctx2d.fillStyle=th.stripe;ctx2d.save();ctx2d.beginPath();
+                    ctx2d.moveTo(s.x,s.y+4);ctx2d.quadraticCurveTo(s.x,s.y,s.x+4,s.y);
+                    ctx2d.lineTo(s.x+stW,s.y);ctx2d.lineTo(s.x+stW,s.y+sh);
+                    ctx2d.lineTo(s.x+4,s.y+sh);ctx2d.quadraticCurveTo(s.x,s.y+sh,s.x,s.y+sh-4);
+                    ctx2d.closePath();ctx2d.fill();ctx2d.restore();
+                    if(vp.scale<0.2)return;
+                    // Icon circle (top-left corner)
+                    if(vp.scale>0.4){
+                        const ir=15*vp.scale;
+                        ctx2d.beginPath();ctx2d.arc(s.x,s.y,ir,0,Math.PI*2);
+                        ctx2d.fillStyle=th.iconBg;ctx2d.fill();
+                        ctx2d.strokeStyle=th.border;ctx2d.lineWidth=1;
+                        ctx2d.beginPath();ctx2d.arc(s.x,s.y,ir,0,Math.PI*2);ctx2d.stroke();
+                        ctx2d.font=`${Math.max(11,13*vp.scale)}px Segoe UI`;
+                        ctx2d.textAlign='center';ctx2d.textBaseline='middle';
+                        ctx2d.fillStyle=th.border;ctx2d.fillText(th.icon,s.x,s.y);ctx2d.textBaseline='alphabetic';
+                    }
+                    // Text layout — single line with ellipsis truncation
+                    const padL=12*vp.scale,cx2=s.x+stW+padL,maxW=sw-stW-padL-8*vp.scale;
+                    const rawLabel=n.label.replace(/\n/g,' ').trim();
+                    const tableName=rawLabel.includes('.')?rawLabel.split('.').pop():rawLabel.split('\n').pop()||rawLabel;
+                    if(n.schema&&vp.scale>0.45){
+                        const sfs=Math.max(9,11*vp.scale);ctx2d.font=`400 ${sfs}px Segoe UI,sans-serif`;
+                        ctx2d.fillStyle=active?th.border:`rgba(${rb},${gb},${bb},0.6)`;ctx2d.textAlign='left';
+                        let sl=n.schema;while(ctx2d.measureText(sl).width>maxW&&sl.length>2)sl=sl.slice(0,-1);
+                        if(sl!==n.schema)sl=sl.slice(0,-1)+'\u2026';
+                        ctx2d.fillText(sl,cx2,s.y+sh*0.42);
+                    }
+                    const nfs=Math.max(11,13*vp.scale);ctx2d.font=`600 ${nfs}px Segoe UI,sans-serif`;
+                    ctx2d.fillStyle=active?'#111':'#1a1a1a';ctx2d.textAlign='left';
+                    let tl=tableName;while(ctx2d.measureText(tl).width>maxW&&tl.length>2)tl=tl.slice(0,-1);
+                    if(tl.length<tableName.length)tl=tl.slice(0,-1)+'\u2026';
+                    ctx2d.fillText(tl,cx2,n.schema&&vp.scale>0.45?s.y+sh*0.72:s.y+sh*0.62);
+                    // Selection ring
+                    if(isSel){ctx2d.strokeStyle=th.border;ctx2d.lineWidth=2.5;rr(s.x-1.5,s.y-1.5,sw+3,sh+3,5);ctx2d.stroke();}
+                    // Hover port dot
+                    if(isHov&&vp.scale>0.4){
+                        ctx2d.beginPath();ctx2d.arc(s.x+sw,s.y+sh/2,5*vp.scale,0,Math.PI*2);ctx2d.fillStyle=th.border;ctx2d.fill();
+                        ctx2d.beginPath();ctx2d.arc(s.x+sw,s.y+sh/2,3*vp.scale,0,Math.PI*2);ctx2d.fillStyle='#fff';ctx2d.fill();
+                    }
+                }
+
+                function drawEdgeLine(e){
+                    const fn=nodeMap[e.from],tn=nodeMap[e.to];if(!fn||!tn)return;
+                    const{fromSide,toSide}=getBestPorts(fn,tn);
+                    const fsc=w2s(fn.x,fn.y),tsc=w2s(tn.x,tn.y);
+                    const fp=getPort(fn,fromSide,tsc.x,tsc.y),tp=getPort(tn,toSide,fsc.x,fsc.y);
+                    if(!isEdgeVisible(fp,tp))return;
+                    const active=(hov&&(hov.id===fn.id||hov.id===tn.id))||(sel&&(sel.id===fn.id||sel.id===tn.id));
+                    const th1=TH[fn.type],isCtrl=fn.type==='control'||tn.type==='control';
+                    const arrowOff=active?11:9;
+                    const toDir={left:{dx:-1,dy:0},right:{dx:1,dy:0},top:{dx:0,dy:-1},bottom:{dx:0,dy:1}}[toSide]||{dx:0,dy:0};
+                    const tpStop={x:tp.x-toDir.dx*arrowOff,y:tp.y-toDir.dy*arrowOff};
+                    ctx2d.save();ctx2d.beginPath();ctx2d.moveTo(fp.x,fp.y);
+                    if(vp.scale<0.25){ctx2d.lineTo(tpStop.x,tpStop.y);}
+                    else{const{cp1x,cp1y,cp2x,cp2y}=getBezier(fp,tpStop,fromSide,toSide);ctx2d.bezierCurveTo(cp1x,cp1y,cp2x,cp2y,tpStop.x,tpStop.y);}
+                    ctx2d.strokeStyle=active?th1.border:'#bbb7b3';ctx2d.lineWidth=active?2.2:1.4;
+                    if(isCtrl)ctx2d.setLineDash([4,3]);
+                    ctx2d.stroke();ctx2d.setLineDash([]);ctx2d.restore();
+                    if(e.label&&vp.scale>0.45){
+                        const mx=(fp.x+tp.x)/2,my=(fp.y+tp.y)/2-8*vp.scale,fs=Math.max(8,9*vp.scale);
+                        ctx2d.font=`600 ${fs}px Consolas,monospace`;ctx2d.textAlign='center';ctx2d.textBaseline='middle';
+                        ctx2d.fillStyle=active?th1.border:'#9a9693';ctx2d.fillText(e.label,mx,my);ctx2d.textBaseline='alphabetic';
+                    }
+                }
+
+                function drawEdgeArrow(e){
+                    const fn=nodeMap[e.from],tn=nodeMap[e.to];if(!fn||!tn)return;
+                    const{fromSide,toSide}=getBestPorts(fn,tn);
+                    const fsc=w2s(fn.x,fn.y),tsc=w2s(tn.x,tn.y);
+                    const fp=getPort(fn,fromSide,tsc.x,tsc.y),tp=getPort(tn,toSide,fsc.x,fsc.y);
+                    if(!isEdgeVisible(fp,tp))return;
+                    const active=(hov&&(hov.id===fn.id||hov.id===tn.id))||(sel&&(sel.id===fn.id||sel.id===tn.id));
+                    const{cp1x,cp1y,cp2x,cp2y}=getBezier(fp,tp,fromSide,toSide);
+                    const tdx=tp.x-cp2x,tdy=tp.y-cp2y;
+                    const ang=Math.abs(tdx)<0.01&&Math.abs(tdy)<0.01?Math.atan2(tp.y-fp.y,tp.x-fp.x):Math.atan2(tdy,tdx);
+                    drawArrow(tp,ang,active?TH[fn.type].border:'#666260');
+                }
+
+                function getChain(id){
+                    const s=new Set([id]);const up=[id],dn=[id];
+                    while(up.length){const c=up.pop();edges.forEach(e=>{if(e.to===c&&!s.has(e.from)){s.add(e.from);up.push(e.from);}});}
+                    while(dn.length){const c=dn.pop();edges.forEach(e=>{if(e.from===c&&!s.has(e.to)){s.add(e.to);dn.push(e.to);}});}
+                    return s;
+                }
+
+                function _doRender(){
+                    _rafPending=false;
+                    hovChain=(hov&&!dragNode)?getChain(hov.id):null;
+                    drawBackground();
+                    // pass 1: edges
+                    edges.forEach(e=>{
+                        const inC=!hovChain||(hovChain.has(e.from)&&hovChain.has(e.to));
+                        if(!inC){ctx2d.save();ctx2d.globalAlpha=0.35;}
+                        drawEdgeLine(e);
+                        if(!inC)ctx2d.restore();
+                    });
+                    // pass 2: nodes
+                    nodes.forEach(n=>{
+                        const inC=!hovChain||hovChain.has(n.id);
+                        if(!inC){ctx2d.save();ctx2d.globalAlpha=0.4;}
+                        drawNode(n);
+                        if(!inC)ctx2d.restore();
+                        if(selGroup.has(n.id)){
+                            const sp=w2s(n.x-n.w/2,n.y-n.h/2),sw2=n.w*vp.scale,sh2=n.h*vp.scale;
+                            ctx2d.save();ctx2d.strokeStyle='#0078d4';ctx2d.lineWidth=2;ctx2d.setLineDash([4,3]);
+                            ctx2d.shadowColor='rgba(0,120,212,0.35)';ctx2d.shadowBlur=6;
+                            rr(sp.x-3,sp.y-3,sw2+6,sh2+6,6);ctx2d.stroke();ctx2d.setLineDash([]);ctx2d.restore();
+                        }
+                    });
+                    // pass 3: arrowheads
+                    if(vp.scale>=0.12){edges.forEach(e=>{const inC=!hovChain||(hovChain.has(e.from)&&hovChain.has(e.to));if(!inC){ctx2d.save();ctx2d.globalAlpha=0.35;}drawEdgeArrow(e);if(!inC)ctx2d.restore();});}
+                    // pass 4: rubber-band
+                    if(rubberBand){
+                        const x=Math.min(rubberBand.sx,rubberBand.ex),y=Math.min(rubberBand.sy,rubberBand.ey);
+                        const w2=Math.abs(rubberBand.ex-rubberBand.sx),h2=Math.abs(rubberBand.ey-rubberBand.sy);
+                        ctx2d.save();ctx2d.fillStyle='rgba(0,120,212,0.06)';ctx2d.fillRect(x,y,w2,h2);
+                        ctx2d.strokeStyle='rgba(0,120,212,0.7)';ctx2d.lineWidth=1.5;ctx2d.setLineDash([5,3]);ctx2d.strokeRect(x,y,w2,h2);ctx2d.setLineDash([]);ctx2d.restore();
+                    }
+                    if(_minimapDirty){_minimapDirty=false;drawMinimap();}
+                }
+
+                function drawMinimap(){
+                    if(!nodes.length){mmCtx.clearRect(0,0,MM_W,MM_H);return;}
+                    mmCtx.clearRect(0,0,MM_W,MM_H);
+                    const mnx=Math.min(...nodes.map(n=>n.x-n.w/2)),mxx=Math.max(...nodes.map(n=>n.x+n.w/2));
+                    const mny=Math.min(...nodes.map(n=>n.y-n.h/2)),mxy=Math.max(...nodes.map(n=>n.y+n.h/2));
+                    const ww=mxx-mnx||1,wh2=mxy-mny||1;
+                    const pad=6,sc=Math.min((MM_W-pad*2)/ww,(MM_H-pad*2)/wh2);
+                    const ox=pad+(MM_W-pad*2-ww*sc)/2,oy=pad+(MM_H-pad*2-wh2*sc)/2;
+                    const wx2=x=>ox+(x-mnx)*sc,wy2=y=>oy+(y-mny)*sc;
+                    mmCtx.strokeStyle='#ccc';mmCtx.lineWidth=0.5;
+                    edges.forEach(e=>{const fn=nodeMap[e.from],tn=nodeMap[e.to];if(!fn||!tn)return;mmCtx.beginPath();mmCtx.moveTo(wx2(fn.x+fn.w/2),wy2(fn.y));mmCtx.lineTo(wx2(tn.x-tn.w/2),wy2(tn.y));mmCtx.stroke();});
+                    nodes.forEach(n=>{const th=TH[n.type]||TH.source;mmCtx.fillStyle=th.border;mmCtx.fillRect(wx2(n.x-n.w/2),wy2(n.y-n.h/2),Math.max(4,n.w*sc),Math.max(2,n.h*sc));});
+                    const vl=s2w(0,0),vr=s2w(cv.width,cv.height);
+                    const vx=wx2(vl.x),vy=wy2(vl.y),vw2=(vr.x-vl.x)*sc,vh2=(vr.y-vl.y)*sc;
+                    mmCtx.strokeStyle='rgba(0,120,212,.7)';mmCtx.lineWidth=1.5;mmCtx.strokeRect(vx,vy,vw2,vh2);
+                    mmCtx.fillStyle='rgba(0,120,212,.07)';mmCtx.fillRect(vx,vy,vw2,vh2);
+                    mmCv._sc=sc;mmCv._ox=ox;mmCv._oy=oy;mmCv._mnx=mnx;mmCv._mny=mny;
+                }
+
+                // ── parseAndRender (exposed to button) ──
+                // ── Clear canvas completely ──
+                function clearCanvas(){
+                    nodes=[]; edges=[]; nodeMap={};
+                    undoStack=[]; redoStack=[]; updUndoBtn();
+                    hov=null; sel=null; selGroup.clear();
+                    dragNode=null; panDrag=false; rubberBand=null;
+                    _everFit=false;
+                    setDfNodeDetail(null);
+                    setDfEmpty(true);
+                    setDfStatus({text:'',err:false,n:0,e:0});
+                    // Wipe canvas pixels
+                    ctx2d.fillStyle='#f8f7f6';
+                    ctx2d.fillRect(0,0,cv.width,cv.height);
+                    // Clear minimap
+                    mmCtx.clearRect(0,0,MM_W,MM_H);
+                }
+
+                function parseAndRender(sql){
+                    if(!sql||!sql.trim()){setDfStatus({text:'',err:false,n:0,e:0});return;}
+                    try{
+                        const parsed=parseSQL(sql);
+                        nodes=parsed.nodes; edges=parsed.edges;
+                        nodeMap={}; nodes.forEach(n=>nodeMap[n.id]=n);
+                        if(!nodes.length){setDfStatus({text:'No tables found. Check your SQL.',err:true,n:0,e:0});return;}
+                        assignLevels(nodes,edges); schemaGroupLayout();
+                        nodeDefaults={}; nodes.forEach(n=>nodeDefaults[n.id]={x:n.x,y:n.y});
+                        undoStack=[]; redoStack=[]; updUndoBtn();
+                        hov=null; sel=null; selGroup.clear(); dragNode=null; // clear stale selection
+                        setDfNodeDetail(null); // close stale detail panel on re-render
+                        _everFit = false; // new data — must fit once
+                        // If canvas already has real dimensions (tab visible, no split change pending),
+                        // fit immediately. Otherwise ResizeObserver / resetFit will handle it.
+                        if(cv.width > 0 && cv.height > 0){
+                            _everFit = true;
+                            fitView();
+                        } else {
+                            render();
+                        }
+                        const typeCounts = {source:0,temp:0,transform:0,target:0,control:0};
+                        nodes.forEach(n=>{ if(typeCounts[n.type]!==undefined) typeCounts[n.type]++; });
+                        setDfStatus({text:'',err:false,n:nodes.length,e:edges.length,types:typeCounts});
+                        setDfEmpty(false);
+                    }catch(err){setDfStatus({text:'Error: '+err.message,err:true,n:0,e:0});}
+                }
+
+                // ── Undo/redo ──
+                function updUndoBtn(){
+                    if(dfEngineRef.current){dfEngineRef.current.canUndo=undoStack.length>0;dfEngineRef.current.canRedo=redoStack.length>0;}
+                    setDfUndoState({u:undoStack.length>0,r:redoStack.length>0});
+                }
+                function undoMove(){
+                    if(!undoStack.length)return;
+                    const s=undoStack.pop();
+                    if(s.type==='group'){const fwd=[];s.snap.forEach(({id,x,y})=>{const nd=nodeMap[id];if(!nd)return;fwd.push({id,x:nd.x,y:nd.y});nd.x=x;nd.y=y;});redoStack.push({type:'group',snap:fwd});}
+                    else{const nd=nodeMap[s.id];if(!nd)return;redoStack.push({type:'single',id:nd.id,x:nd.x,y:nd.y});nd.x=s.x;nd.y=s.y;}
+                    scheduleRender(true);updUndoBtn();
+                }
+                function redoMove(){
+                    if(!redoStack.length)return;
+                    const s=redoStack.pop();
+                    if(s.type==='group'){const bwd=[];s.snap.forEach(({id,x,y})=>{const nd=nodeMap[id];if(!nd)return;bwd.push({id,x:nd.x,y:nd.y});nd.x=x;nd.y=y;});undoStack.push({type:'group',snap:bwd});}
+                    else{const nd=nodeMap[s.id];if(!nd)return;undoStack.push({type:'single',id:nd.id,x:nd.x,y:nd.y});nd.x=s.x;nd.y=s.y;}
+                    scheduleRender(true);updUndoBtn();
+                }
+
+                // ── Mouse interactions ──
+                let _movePending=false;
+                const onMouseDown=e=>{
+                    if(e.button===1){e.preventDefault();panDrag=true;dragStart={x:e.clientX,y:e.clientY};vpStart={...vp};cv.style.cursor='grabbing';return;}
+                    if(e.button!==0)return;
+                    const rect=cv.getBoundingClientRect();
+                    const sx=e.clientX-rect.left,sy=e.clientY-rect.top;
+                    const w=s2w(sx,sy);didMove=false;
+                    if(panMode){panDrag=true;dragStart={x:e.clientX,y:e.clientY};vpStart={...vp};cv.style.cursor='grabbing';return;}
+                    const hit=nodes.find(n=>w.x>=n.x-n.w/2&&w.x<=n.x+n.w/2&&w.y>=n.y-n.h/2&&w.y<=n.y+n.h/2);
+                    if(hit){
+                        if(selGroup.has(hit.id)&&selGroup.size>1){
+                            groupDrag=true;groupDragStart={wx:w.x,wy:w.y};groupDragOffsets=[];
+                            selGroup.forEach(id=>{const nd=nodeMap[id];if(nd){nd._dsx=nd.x;nd._dsy=nd.y;groupDragOffsets.push({id,ox:nd.x-w.x,oy:nd.y-w.y});}});
+                            cv.style.cursor='grabbing';
+                        } else {
+                            selGroup.clear();hit._dsx=hit.x;hit._dsy=hit.y;
+                            dragNode=hit;dragNodeOffset={x:w.x-hit.x,y:w.y-hit.y};sel=hit;cv.style.cursor='grabbing';
+                        }
+                        render();
+                    } else {
+                        selGroup.clear();sel=null;
+                        setDfNodeDetail(null); // close detail on empty click
+                        if(nodes.length){rubberBand={sx,sy,ex:sx,ey:sy};cv.style.cursor='crosshair';}
+                        else{panDrag=true;dragStart={x:e.clientX,y:e.clientY};vpStart={...vp};cv.style.cursor='grabbing';}
+                        render();
+                    }
+                };
+                const onMouseUp=e=>{
+                    if(groupDrag){
+                        if(didMove){const snap=groupDragOffsets.map(o=>{const nd=nodeMap[o.id];return{id:o.id,x:nd._dsx,y:nd._dsy};});undoStack.push({type:'group',snap});if(undoStack.length>50)undoStack.shift();redoStack.length=0;updUndoBtn();}
+                        groupDrag=false;groupDragStart=null;groupDragOffsets=[];cv.style.cursor=hov?'grab':'default';render();
+                    }
+                    if(dragNode){
+                        if(didMove){undoStack.push({type:'single',id:dragNode.id,x:dragNode._dsx,y:dragNode._dsy});if(undoStack.length>50)undoStack.shift();redoStack.length=0;updUndoBtn();}
+                        else {
+                            // Single click (no drag) — show detail panel
+                            const n=dragNode;
+                            const ins=edges.filter(e=>e.to===n.id).map(e=>({...e,_fromType:nodeMap[e.from]?.type||'source'}));
+                            const outs=edges.filter(e=>e.from===n.id).map(e=>({...e,_toType:nodeMap[e.to]?.type||'target'}));
+                            setDfNodeDetail({node:n, ins, outs});
+                        }
+                        dragNode=null;cv.style.cursor=hov?'grab':'default';render();
+                    }
+                    if(rubberBand){
+                        const x1=Math.min(rubberBand.sx,rubberBand.ex),x2=Math.max(rubberBand.sx,rubberBand.ex);
+                        const y1=Math.min(rubberBand.sy,rubberBand.ey),y2=Math.max(rubberBand.sy,rubberBand.ey);
+                        if(x2-x1>6||y2-y1>6){const w1=s2w(x1,y1),w2=s2w(x2,y2);selGroup.clear();nodes.forEach(n=>{if(n.x+n.w/2>=w1.x&&n.x-n.w/2<=w2.x&&n.y+n.h/2>=w1.y&&n.y-n.h/2<=w2.y)selGroup.add(n.id);});}
+                        rubberBand=null;cv.style.cursor='default';render();
+                    }
+                    if(panDrag){panDrag=false;cv.style.cursor=panMode?'grab':hov?'grab':'default';}
+                    hideTip();
+                };
+                const onMouseMove=e=>{
+                    if(_movePending)return;_movePending=true;
+                    requestAnimationFrame(()=>{
+                        _movePending=false;
+                        const rect=cv.getBoundingClientRect();
+                        const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+                        if(groupDrag){didMove=true;const w=s2w(mx,my);groupDragOffsets.forEach(o=>{const nd=nodeMap[o.id];if(nd){nd.x=w.x+o.ox;nd.y=w.y+o.oy;}});scheduleRender(false);return;}
+                        if(dragNode){didMove=true;const w=s2w(mx,my);dragNode.x=w.x-dragNodeOffset.x;dragNode.y=w.y-dragNodeOffset.y;scheduleRender(false);return;}
+                        if(rubberBand){didMove=true;rubberBand.ex=mx;rubberBand.ey=my;scheduleRender(false);return;}
+                        if(panDrag){didMove=true;vp.x=vpStart.x+(e.clientX-dragStart.x);vp.y=vpStart.y+(e.clientY-dragStart.y);updZ();scheduleRender(true);return;}
+                        const w=s2w(mx,my);const prev=hov;
+                        hov=nodes.find(n=>w.x>=n.x-n.w/2&&w.x<=n.x+n.w/2&&w.y>=n.y-n.h/2&&w.y<=n.y+n.h/2)||null;
+                        cv.style.cursor=panMode?'grab':hov?'grab':'default';
+                        if(hov){showTip(hov,e.clientX,e.clientY);}else{hideTip();}
+                        if(prev!==hov)scheduleRender(false);
+                    });
+                };
+                const onWheel=e=>{
+                    e.preventDefault();
+                    const f=e.deltaY<0?1.1:0.91;
+                    const rect=cv.getBoundingClientRect();
+                    doZoom(f,e.clientX-rect.left,e.clientY-rect.top);
+                };
+                const onCtxMenu=e=>{e.preventDefault();};
+
+                cv.addEventListener('mousedown',onMouseDown);
+                window.addEventListener('mouseup',onMouseUp);
+                window.addEventListener('mousemove',onMouseMove);
+                cv.addEventListener('wheel',onWheel,{passive:false});
+                cv.addEventListener('contextmenu',onCtxMenu);
+
+                // minimap click
+                const onMmDown=e=>{
+                    if(!mmCv._sc)return;
+                    const rect=mmCv.getBoundingClientRect();
+                    const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+                    vp.x=-((mx-mmCv._ox)/mmCv._sc+mmCv._mnx)*vp.scale;
+                    vp.y=-((my-mmCv._oy)/mmCv._sc+mmCv._mny)*vp.scale;
+                    updZ();render();
+                };
+                mmCv.addEventListener('mousedown',onMmDown);
+
+                // resize observer
+                let _resizeT=null;
+                const ro=new ResizeObserver(()=>{clearTimeout(_resizeT);_resizeT=setTimeout(()=>{resize();if(nodes.length)render();},_everFit?80:16);});
+                ro.observe(cwEl);
+
+                // ── Export PNG (offscreen, full diagram, 2× DPR) ──
+                function exportPNG(){
+                    if(!nodes.length) return;
+                    const pad=48;
+                    const mnx=Math.min(...nodes.map(n=>n.x-n.w/2)),mxx=Math.max(...nodes.map(n=>n.x+n.w/2));
+                    const mny=Math.min(...nodes.map(n=>n.y-n.h/2)),mxy=Math.max(...nodes.map(n=>n.y+n.h/2));
+                    const W=mxx-mnx+pad*2, H=mxy-mny+pad*2;
+                    const DPR=2;
+                    const off=document.createElement('canvas');
+                    off.width=W*DPR; off.height=H*DPR;
+                    const oc=off.getContext('2d');
+                    oc.scale(DPR,DPR);
+                    // background
+                    oc.fillStyle='#f8f7f6'; oc.fillRect(0,0,W,H);
+                    oc.save();
+                    oc.translate(-mnx+pad,-mny+pad);
+                    // rounded rect helper
+                    function _rc(x,y,w,h,r){oc.beginPath();oc.moveTo(x+r,y);oc.lineTo(x+w-r,y);oc.quadraticCurveTo(x+w,y,x+w,y+r);oc.lineTo(x+w,y+h-r);oc.quadraticCurveTo(x+w,y+h,x+w-r,y+h);oc.lineTo(x+r,y+h);oc.quadraticCurveTo(x,y+h,x,y+h-r);oc.lineTo(x,y+r);oc.quadraticCurveTo(x,y,x+r,y);oc.closePath();}
+                    // edges
+                    edges.forEach(e2=>{
+                        const fn=nodeMap[e2.from],tn=nodeMap[e2.to]; if(!fn||!tn)return;
+                        const {fromSide,toSide}=getBestPorts(fn,tn);
+                        function xport(node,side){const cx=node.x,cy=node.y,hw=node.w/2,hh=node.h/2;if(side==='right')return{x:cx+hw,y:cy};if(side==='left')return{x:cx-hw,y:cy};if(side==='bottom')return{x:cx,y:cy+hh};return{x:cx,y:cy-hh};}
+                        const fp=xport(fn,fromSide),tp=xport(tn,toSide);
+                        const dist=Math.sqrt((tp.x-fp.x)**2+(tp.y-fp.y)**2);
+                        const bend=Math.min(Math.max(dist*0.42,40),200);
+                        const tang={right:{x:1,y:0},left:{x:-1,y:0},bottom:{x:0,y:1},top:{x:0,y:-1}};
+                        const ft=tang[fromSide],tt=tang[toSide];
+                        oc.beginPath();oc.moveTo(fp.x,fp.y);
+                        oc.bezierCurveTo(fp.x+ft.x*bend,fp.y+ft.y*bend,tp.x+tt.x*bend,tp.y+tt.y*bend,tp.x,tp.y);
+                        oc.strokeStyle='#ccc8c3';oc.lineWidth=1.2;
+                        if(fn.type==='control'||tn.type==='control')oc.setLineDash([4,3]);
+                        oc.stroke();oc.setLineDash([]);
+                        oc.beginPath();oc.arc(fp.x,fp.y,2.8,0,Math.PI*2);oc.fillStyle='#c2bdb8';oc.fill();
+                        const tangDir={left:Math.PI,right:0,top:-Math.PI/2,bottom:Math.PI/2};
+                        const ha=tangDir[toSide];
+                        const [r2,g2,b2]=h2rgb(TH[tn.type].border);
+                        oc.beginPath();oc.moveTo(tp.x,tp.y);oc.lineTo(tp.x-8*Math.cos(ha-.38),tp.y-8*Math.sin(ha-.38));oc.lineTo(tp.x-8*Math.cos(ha+.38),tp.y-8*Math.sin(ha+.38));oc.closePath();
+                        oc.fillStyle=`rgba(${r2},${g2},${b2},.3)`;oc.fill();
+                        if(e2.label){
+                            const mx2=(fp.x+tp.x)/2,my2=(fp.y+tp.y)/2-7;
+                            oc.font='600 9.5px Segoe UI,sans-serif';oc.textAlign='center';oc.textBaseline='middle';
+                            const tw=oc.measureText(e2.label).width+8,th3=14;
+                            oc.fillStyle='#f3f2f1';_rc(mx2-tw/2,my2-th3/2,tw,th3,2);oc.fill();
+                            oc.strokeStyle='#d4d0cc';oc.lineWidth=1;_rc(mx2-tw/2,my2-th3/2,tw,th3,2);oc.stroke();
+                            oc.fillStyle='#8a8a8a';oc.fillText(e2.label,mx2,my2);oc.textBaseline='alphabetic';
+                        }
+                    });
+                    // nodes
+                    nodes.forEach(n=>{
+                        const th2=TH[n.type]||TH.source;const [rb,gb2,bb]=h2rgb(th2.border);
+                        const sx=n.x-n.w/2,sy=n.y-n.h/2;
+                        oc.save();oc.shadowColor='rgba(0,0,0,.09)';oc.shadowBlur=6;oc.shadowOffsetY=1.5;
+                        oc.fillStyle='#fff';_rc(sx,sy,n.w,n.h,4);oc.fill();oc.restore();
+                        oc.fillStyle='#fff';_rc(sx,sy,n.w,n.h,4);oc.fill();
+                        oc.strokeStyle=`rgba(${rb},${gb2},${bb},.28)`;oc.lineWidth=1;_rc(sx,sy,n.w,n.h,4);oc.stroke();
+                        // left stripe
+                        const stW=4; oc.fillStyle=th2.stripe;oc.save();oc.beginPath();
+                        oc.moveTo(sx,sy+4);oc.quadraticCurveTo(sx,sy,sx+4,sy);oc.lineTo(sx+stW,sy);oc.lineTo(sx+stW,sy+n.h);oc.quadraticCurveTo(sx,sy+n.h,sx,sy+n.h-4);oc.closePath();oc.fill();oc.restore();
+                        // icon circle — top-left corner
+                        const ir=15,ix=sx,iy=sy;
+                        oc.beginPath();oc.arc(ix,iy,ir,0,Math.PI*2);oc.fillStyle=th2.iconBg;oc.fill();
+                        oc.strokeStyle=th2.border;oc.lineWidth=1;
+                        oc.beginPath();oc.arc(ix,iy,ir,0,Math.PI*2);oc.stroke();
+                        oc.font='17px Segoe UI';oc.textAlign='center';oc.textBaseline='middle';
+                        oc.fillStyle=th2.border;oc.fillText(th2.icon,ix,iy);oc.textBaseline='alphabetic';
+                        // wrapped text — use cached lines from computeNodeSize
+                        const textX=sx+stW+16;
+                        const LINE_H=22;
+                        const nameLines=n._nameLines||[n.label.replace(/\n/g,' ').trim()];
+                        const schemaLines=n._schemaLines||[];
+                        const totalLines=schemaLines.length+nameLines.length;
+                        const blockH=totalLines*LINE_H;
+                        let curY=sy+(n.h-blockH)/2+LINE_H*0.8;
+                        if(schemaLines.length){
+                            oc.font='400 13px Segoe UI,sans-serif';oc.fillStyle=`rgba(${rb},${gb2},${bb},0.65)`;oc.textAlign='left';
+                            schemaLines.forEach(line=>{oc.fillText(line,textX,curY);curY+=LINE_H;});
+                        }
+                        oc.font='600 15px Segoe UI,sans-serif';oc.fillStyle='#1a1a1a';oc.textAlign='left';
+                        nameLines.forEach(line=>{oc.fillText(line,textX,curY);curY+=LINE_H;});
+                    });
+                    oc.restore();
+                    off.toBlob(blob=>{
+                        const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='data-flow.png';a.click();
+                        setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+                    },'image/png');
+                }
+
+                // expose engine to React
+                dfEngineRef.current={
+                    parseAndRender,
+                    clearCanvas,
+                    fitView,
+                    resetFit(){ _everFit=false; },
+                    fitViewDeferred(ms=120){ _everFit=false; setTimeout(()=>{ resize(); if(!_everFit&&nodes.length){fitView();_everFit=true;} },ms); },
+                    doZoom:(f)=>doZoom(f),
+                    togglePan:()=>{panMode=!panMode;cv.style.cursor=panMode?'grab':'default';return panMode;},
+                    undoMove,redoMove,
+                    exportPNG,
+                    getNodeCount:()=>nodes.length,
+                    getEdgeCount:()=>edges.length,
+                };
+
+                resize();
+                // Do NOT auto-run — wait for user to press Run button
+
+                return()=>{
+                    cv.removeEventListener('mousedown',onMouseDown);
+                    window.removeEventListener('mouseup',onMouseUp);
+                    window.removeEventListener('mousemove',onMouseMove);
+                    hideTip();
+                    cv.removeEventListener('wheel',onWheel);
+                    cv.removeEventListener('contextmenu',onCtxMenu);
+                    mmCv.removeEventListener('mousedown',onMmDown);
+                    ro.disconnect();
+                    dfEngineRef.current=null;
+                };
+                }; // end tryInit
+
+                // Retry until canvas elements are in the DOM (they render on first paint)
+                let frame = requestAnimationFrame(function attempt(){
+                    if(dfCanvasElRef.current && dfMmCanvasRef.current){ tryInit(); }
+                    else { frame = requestAnimationFrame(attempt); }
+                });
+                return () => cancelAnimationFrame(frame);
+            }, []); // mount once — engine persists across tab switches
 
             // Apply dark mode class to <html>
             useEffect(() => {
                 document.documentElement.classList.toggle('dark', isDark);
+                try { localStorage.setItem('sqlcanvas-dark', isDark ? '1' : '0'); } catch(_) {}
             }, [isDark]);
+
+            // Keep activeTabRef in sync so non-reactive callbacks (runAllTabs etc.) can read it
+            useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
+            // Keep modeRef in sync so handleModeSwitch never hits false early-return from stale closure
+            useEffect(() => { modeRef.current = mode; }, [mode]);
+
 
             // Drag-to-resize
             const onMove = useCallback((cx, cy) => {
@@ -1267,38 +2214,38 @@
                 };
             }, [isDragging, onMove]);
 
-            // Ctrl/Cmd+Enter
-            useEffect(() => {
-                const onKey = e => {
-                    if ((e.ctrlKey||e.metaKey) && e.key==='Enter' && inputText && !isProcessing) {
-                        e.preventDefault(); handleProcess();
-                    }
-                };
-                window.addEventListener('keydown', onKey);
-                return () => window.removeEventListener('keydown', onKey);
-            }, [inputText, isProcessing]);
+            // processedSqlRef — tracks SQL that was last explicitly processed (by Run button or drag-drop)
+            // All tabs share this so switching tabs never re-triggers processing
+            const processedSqlRef = useRef('');
+            const dfLastRenderedRef = useRef('');
 
-            // Re-process when checkboxes change if output already exists (minify mode only)
+            // Re-process minify when checkboxes change — only if user already committed SQL
             useEffect(() => {
-                if (inputText && outputText && mode === 'minify') {
-                    processText(inputText, 'minify');
+                if (processedSqlRef.current.trim() && mode === 'minify') {
+                    processTextWith(processedSqlRef.current, 'minify', autoAlias, removeNL);
                 }
             }, [autoAlias, removeNL]);
 
-            const workerRef  = useRef(null);
-            const reqIdRef   = useRef(0);
+            const workerRef    = useRef(null);
+            const bgWorkerRef  = useRef(null); // background worker — cache-warming only, never touches UI state
+            const bgJobRef     = useRef(null);  // {key, text} — tracks what bg worker is currently computing
+            const reqIdRef     = useRef(0);
+            // Cache results per mode — avoids reprocessing the same input twice
+            const resultCache  = useRef({}); // { 'minify:true:false': {text, output, stats}, ... }
 
             function getWorker() {
                 if (workerRef.current) return workerRef.current;
+                
                 const src = [
-                    astMinifyEngine.toString(),
-                    sqlBeautify.toString(),
+                    // Pulling string definitions from global scope since we isolated them from Babel
+                    window.astMinifyEngine.toString(),
+                    window.sqlBeautify.toString(),
                     `self.onmessage = function(e) {
                         var d = e.data, text = d.text, mode = d.mode, autoAlias = d.autoAlias, removeNL = d.removeNL, reqId = d.reqId;
                         try {
                             if (mode === 'beautify') {
                                 var out = sqlBeautify(text);
-                                self.postMessage({ out: out, mode: mode, reqId: reqId });
+                                self.postMessage({ out: out, mode: mode, reqId: reqId, text: text, autoAlias: autoAlias, removeNL: removeNL });
                             } else {
                                 var slc  = (text.match(/--[^\\n]*/g)||[]).length;
                                 var mlc  = (text.match(/\\/\\*[\\s\\S]*?\\*\\//g)||[]).length;
@@ -1310,7 +2257,7 @@
                                 var mChr = out.length;
                                 var oSz  = new Blob([text]).size;
                                 var mSz  = new Blob([out]).size;
-                                self.postMessage({ out: out, mode: mode, reqId: reqId, stats: {
+                                self.postMessage({ out: out, mode: mode, reqId: reqId, text: text, autoAlias: autoAlias, removeNL: removeNL, stats: {
                                     originalSize:oSz, minifiedSize:mSz, originalChars:oChr, minifiedChars:mChr,
                                     originalLines:oLns, minifiedLines:mLns, singleLineComments:slc, multiLineComments:mlc,
                                     totalComments:slc+mlc,
@@ -1327,13 +2274,20 @@
                 var blob = new Blob([src], { type: 'application/javascript' });
                 var worker = new Worker(URL.createObjectURL(blob));
                 worker.onmessage = (e) => {
-                    const { out, stats: s, error: err, reqId, mode: resMode } = e.data;
-                    if (reqId !== reqIdRef.current) return;
+                    const { out, stats: s, error: err, reqId, mode: resMode, text: resText, autoAlias: resAlias, removeNL: resNL } = e.data;
+                    if (reqId !== reqIdRef.current) { setIsProcessing(false); return; }
+                    // Also discard if the mode we computed for no longer matches what user sees
+                    if (resMode !== modeRef.current) { setIsProcessing(false); return; }
                     if (err) {
                         setError(err);
                     } else {
                         setOutputText(out);
-                        if (resMode === 'minify' && s) setStats(s);
+                        const st = (resMode === 'minify' && s) ? s : null;
+                        if (st) setStats(st); else setStats(null);
+                        if (resText) {
+                            const key = resMode === 'beautify' ? `beautify` : `minify:${resAlias}:${resNL}`;
+                            resultCache.current[key] = { text: resText, output: out, stats: st };
+                        }
                     }
                     setIsProcessing(false);
                 };
@@ -1347,29 +2301,140 @@
 
             useEffect(() => { getWorker(); }, []);
 
-            function processText(text, currentMode) {
-                if (!text) return;
-                const m = currentMode || mode;
-                setIsProcessing(true); setStats(null); setError(null);
-                const reqId = ++reqIdRef.current;
-                getWorker().postMessage({ text, mode: m, autoAlias, removeNL, reqId });
+            // Background worker — silently populates cache for the non-active mode.
+            // Never calls setOutputText / setIsProcessing — zero UI impact.
+            function getBgWorker() {
+                if (bgWorkerRef.current) return bgWorkerRef.current;
+                const src = [
+                    window.astMinifyEngine.toString(),
+                    window.sqlBeautify.toString(),
+                    `self.onmessage = function(e) {
+                        var d = e.data, text = d.text, mode = d.mode, autoAlias = d.autoAlias, removeNL = d.removeNL;
+                        try {
+                            var out, stats = null;
+                            if (mode === 'beautify') {
+                                out = sqlBeautify(text);
+                            } else {
+                                var slc=(text.match(/--[^\n]*/g)||[]).length, mlc=(text.match(/\/\*[\s\S]*?\*\//g)||[]).length;
+                                var oLns=text.split('\n').filter(function(l){return l.trim()!=='';}).length, oChr=text.length;
+                                out = astMinifyEngine(text, autoAlias);
+                                if (removeNL) out = out.replace(/\n+/g,' ').replace(/  +/g,' ').trim();
+                                var mLns=out.split('\n').filter(function(l){return l.trim()!=='';}).length, mChr=out.length;
+                                var oSz=new Blob([text]).size, mSz=new Blob([out]).size;
+                                stats = { originalSize:oSz,minifiedSize:mSz,originalChars:oChr,minifiedChars:mChr,
+                                    originalLines:oLns,minifiedLines:mLns,singleLineComments:slc,multiLineComments:mlc,
+                                    totalComments:slc+mlc,reduction:(((oSz-mSz)/oSz)*100).toFixed(1),
+                                    charReduction:(((oChr-mChr)/oChr)*100).toFixed(1),lineReduction:(((oLns-mLns)/oLns)*100).toFixed(1) };
+                            }
+                            self.postMessage({ out:out, mode:mode, text:text, autoAlias:autoAlias, removeNL:removeNL, stats:stats });
+                        } catch(e) {}
+                    };`
+                ].join('\n');
+                var blob = new Blob([src], { type: 'application/javascript' });
+                var w = new Worker(URL.createObjectURL(blob));
+                w.onmessage = (e) => {
+                    const { out, mode: resMode, text: resText, autoAlias: resAlias, removeNL: resNL, stats: s } = e.data;
+                    if (!out || !resText) return;
+                    const key = resMode === 'beautify' ? 'beautify' : ('minify:' + resAlias + ':' + resNL);
+                    // Only write to cache — never update UI
+                    if (!resultCache.current[key] || resultCache.current[key].text !== resText) {
+                        const st = (resMode === 'minify' && s) ? s : null;
+                        resultCache.current[key] = { text: resText, output: out, stats: st };
+                    }
+                };
+                bgWorkerRef.current = w;
+                return w;
             }
 
+            // Core function — all params explicit, no stale closure risk
+            function processTextWith(text, m, alias, nlRemove) {
+                if (!text) return;
+                // beautify ignores autoAlias/removeNL — use a stable key so cache always hits
+                const key = m === 'beautify' ? `beautify` : `minify:${alias}:${nlRemove}`;
+                const cached = resultCache.current[key];
+                if (cached && cached.text === text) {
+                    ++reqIdRef.current; // invalidate any in-flight worker for a different mode
+                    setOutputText(cached.output);
+                    if (cached.stats) setStats(cached.stats); else setStats(null);
+                    setError(null);
+                    setIsProcessing(false);
+                    return;
+                }
+                // If bg worker is already computing this exact job, promote it:
+                // kill bg and repost as fg so the result flows through normal UI path.
+                const bgJob = bgJobRef.current;
+                if (bgJob && bgJob.key === key && bgJob.text === text && bgWorkerRef.current) {
+                    bgWorkerRef.current.terminate();
+                    bgWorkerRef.current = null;
+                    bgJobRef.current = null;
+                }
+                setIsProcessing(true); setStats(null); setError(null);
+                const reqId = ++reqIdRef.current;
+                getWorker().postMessage({ text, mode: m, autoAlias: alias, removeNL: nlRemove, reqId });
+            }
+
+            function processText(text, currentMode) {
+                processTextWith(text, currentMode || mode, autoAlias, removeNL);
+            }
+
+            // Called by Run button — commits SQL for all tabs
             function handleProcess() {
-                processText(inputText, mode);
+                const sql = inputTextRef.current;
+                if (!sql.trim()) return;
+                processedSqlRef.current = sql;
+                // Run minify/beautify for editor tab
+                processText(sql, mode);
+                // Silently pre-warm cache for the other mode
+                const otherMode = modeRef.current === 'beautify' ? 'minify' : 'beautify';
+                const bgKey1 = otherMode === 'beautify' ? 'beautify' : `minify:${autoAlias}:${removeNL}`;
+                bgJobRef.current = { key: bgKey1, text: sql };
+                getBgWorker().postMessage({ text: sql, mode: otherMode, autoAlias, removeNL });
+                // Always sync data flow if it has been rendered before OR if currently on dataflow tab
+                if (dfEngineRef.current && (dfLastRenderedRef.current || activeTab === 'dataflow')) {
+                    dfLastRenderedRef.current = sql;
+                    dfEngineRef.current.parseAndRender(sql);
+                }
             }
 
             function handleModeSwitch(newMode) {
-                if (mode === newMode) return;
+                if (modeRef.current === newMode) return;
+                modeRef.current = newMode; // update immediately so rapid calls see correct state
                 setMode(newMode);
                 setShowReport(false);
-                
-                if (inputTextRef.current.trim()) {
-                    processText(inputTextRef.current, newMode);
+                // Only re-process if user has already committed SQL via Run/drag-drop
+                if (processedSqlRef.current.trim()) {
+                    processTextWith(processedSqlRef.current, newMode, autoAlias, removeNL);
                 } else {
                     setOutputText('');
                     setStats(null);
                     setError(null);
+                }
+            }
+
+            // Drag-drop and file upload — auto-process all tabs immediately
+            function runAllTabs(text) {
+                processedSqlRef.current = text;
+                processText(text, mode);
+                // Silently pre-warm cache for the other mode so switching tabs is instant
+                const otherMode = modeRef.current === 'beautify' ? 'minify' : 'beautify';
+                const bgKey2 = otherMode === 'beautify' ? 'beautify' : `minify:${autoAlias}:${removeNL}`;
+                bgJobRef.current = { key: bgKey2, text };
+                getBgWorker().postMessage({ text, mode: otherMode, autoAlias, removeNL });
+                // Also auto-render data flow
+                if (dfEngineRef.current) {
+                    dfLastRenderedRef.current = text;
+                    dfEngineRef.current.parseAndRender(text);
+                }
+                // If already on dataflow tab and user hasn't manually adjusted the divider,
+                // shift it to 20% so the canvas gets enough room (mirrors tab-click behaviour)
+                if (activeTabRef.current === 'dataflow' && !userAdjustedSplit.current) {
+                    // parseAndRender already sets _everFit=false, but then React re-renders
+                    // the split change which triggers ResizeObserver → resize() which may see
+                    // _everFit=true if the initial render already ran fitView with stale dims.
+                    // Force _everFit=false after the state update settles so the ResizeObserver
+                    // fit runs against the correct final canvas dimensions.
+                    setSplitPct(20);
+                    setTimeout(() => dfEngineRef.current?.resetFit(), 0);
                 }
             }
 
@@ -1382,8 +2447,8 @@
                     inputTextRef.current = text; setInputText(text);
                     setOutputText('');
                     setStats(null);
-                    // Auto-process immediately
-                    setTimeout(() => processText(text), 50);
+                    // Auto-process all tabs immediately for drag/drop
+                    setTimeout(() => runAllTabs(text), 50);
                 };
                 r.readAsText(file); e.target.value = null;
             }
@@ -1415,12 +2480,27 @@
                 URL.revokeObjectURL(url);
             }
 
-            function handleClear() { reqIdRef.current++; inputTextRef.current = ''; setInputText(''); setOutputText(''); setStats(null); setError(null); setIsProcessing(false); }
+            function handleClear() {
+                reqIdRef.current++;
+                resultCache.current = {};
+                processedSqlRef.current = '';
+                dfLastRenderedRef.current = '';
+                inputTextRef.current = '';
+                setInputText(''); setOutputText(''); setStats(null); setError(null); setIsProcessing(false);
+                setFileName('script.sql');
+                // Clear dataflow canvas
+                if (dfEngineRef.current) {
+                    dfEngineRef.current.clearCanvas();
+                } else {
+                    setDfEmpty(true);
+                    setDfStatus({text:'',err:false,n:0,e:0});
+                }
+            }
 
             const inputLines = inputText ? inputText.split('\n').length : 0;
 
             const leftStyle  = isDesktop
-                ? { width:`${splitPct}%`,                  height:'100%' }
+                ? { width:`${splitPct}%`,               height:'100%' }
                 : { width:'100%', height:`${splitPct}%` };
             const rightStyle = isDesktop
                 ? { width:`calc(${100-splitPct}% - 6px)`,  height:'100%' }
@@ -1441,7 +2521,7 @@
                             </div>
                             <div className="flex items-center gap-3">
                                 <Tooltip content="View on GitHub" position="bottom-right">
-                                    <a href="https://github.com/bh00t/SQL-Canvas" target="_blank" rel="noopener noreferrer"
+                                    <a href="https://github.com/bh00t/SQL-Canvas" target="_blank" rel="noopener noreferrer" aria-label="View on GitHub"
                                         className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors flex items-center justify-center">
                                         <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                             <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
@@ -1449,23 +2529,25 @@
                                     </a>
                                 </Tooltip>
                                 <Tooltip content={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'} position="bottom-right">
-                                    <button onClick={()=>setIsDark(!isDark)}
+                                    <button onClick={()=>setIsDark(!isDark)} aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
                                         className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors">
                                         {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                                     </button>
                                 </Tooltip>
                             </div>
                         </div>
-                        <div className="h-0.5 bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                            <div className={`h-full bg-blue-500 transition-all duration-300 ${isProcessing ? 'w-full animate-pulse' : 'w-0'}`} />
+                        <div className="h-0.5 overflow-hidden" style={{background:'transparent'}}>
+                            {isProcessing && (
+                                <div className="h-full bg-blue-500" style={{animation:'progressBar 1.4s ease-in-out infinite',transformOrigin:'left'}} />
+                            )}
                         </div>
                     </header>
 
                     {/* ERROR TOAST */}
                     {error && (
-                        <div className="shrink-0 mx-4 mt-2 px-4 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-400 flex items-center justify-between fade-in">
-                            <span>⚠ AST Error: {error}</span>
-                            <button onClick={()=>setError(null)} className="ml-3 font-bold text-red-400 hover:text-red-600">✕</button>
+                        <div className="shrink-0 mx-3 mt-2 px-3.5 py-2 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-xs text-red-700 dark:text-red-400 flex items-center justify-between gap-2 fade-in shadow-sm">
+                            <span className="flex items-center gap-1.5"><span className="text-red-500">⚠</span> {error}</span>
+                            <button onClick={()=>setError(null)} aria-label="Dismiss error" className="ml-1 p-0.5 rounded text-red-400 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors shrink-0">✕</button>
                         </div>
                     )}
 
@@ -1485,64 +2567,104 @@
                                 r.onload = ev => {
                                     const text = ev.target.result;
                                     inputTextRef.current = text; setInputText(text); setOutputText(''); setStats(null);
-                                    setTimeout(() => processText(text), 50);
+                                    setTimeout(() => runAllTabs(text), 50);
                                 };
                                 r.readAsText(file);
                             }}>
                             {isDragOver && (
-                                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-blue-50/90 dark:bg-blue-900/40 border-2 border-dashed border-blue-400 dark:border-blue-500 rounded pointer-events-none">
-                                    <FileUp className="h-10 w-10 text-blue-400 mb-2" />
-                                    <span className="text-sm font-semibold text-blue-600 dark:text-blue-300">Drop SQL file here</span>
+                                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-blue-50/95 dark:bg-blue-950/70 border-2 border-dashed border-blue-400 dark:border-blue-500 rounded pointer-events-none fade-in">
+                                    <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-900/50 border border-blue-200 dark:border-blue-700 flex items-center justify-center mb-3 shadow-sm">
+                                        <FileUp className="h-6 w-6 text-blue-500 dark:text-blue-400" />
+                                    </div>
+                                    <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">Drop SQL file to open</span>
+                                    <span className="text-xs text-blue-500 dark:text-blue-400 mt-1">.sql or .txt</span>
                                 </div>
                             )}
-                            <div className="shrink-0 h-12 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between px-3 gap-2">
+                            <div className="shrink-0 h-11 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/60 flex items-center justify-between px-3 gap-2">
                                 <div className="flex items-center gap-2 shrink-0">
-                                    <FileCode2 className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300 whitespace-nowrap">Source SQL</span>
+                                    <FileCode2 className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">Source SQL</span>
                                 </div>
                                 <div className="flex items-center gap-1.5 shrink-0">
                                     <input type="file" accept=".sql,.txt" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
-                                    <Tooltip content={isProcessing ? 'Processing…' : mode === 'beautify' ? 'Beautify SQL (Ctrl+Enter)' : 'Minify SQL (Ctrl+Enter)'} position="bottom-right">
-                                        <button onClick={handleProcess} disabled={!inputText || isProcessing}
-                                            className={`flex items-center justify-center p-1.5 rounded-md border shadow-sm transition-all
-                                                ${!inputText||isProcessing
+                                    <Tooltip content={isProcessing ? 'Processing…' : activeTab === 'dataflow' ? 'Draw (Ctrl+Enter)' : mode === 'beautify' ? 'Beautify (Ctrl+Enter)' : 'Minify (Ctrl+Enter)'} position="bottom-right">
+                                        <button
+                                            onClick={handleProcess}
+                                            disabled={!inputText || isProcessing}
+                                            aria-label={isProcessing ? 'Processing' : activeTab === 'dataflow' ? 'Run data flow' : mode === 'beautify' ? 'Beautify SQL' : 'Run SQL'}
+                                            className={`flex items-center justify-center w-7 h-7 rounded-md border transition-all active:scale-95
+                                                ${!inputText || isProcessing
                                                     ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                                                    : activeTab === 'dataflow'
+                                                        ? 'bg-blue-600 border-blue-600 text-white hover:bg-blue-500 cursor-pointer shadow-sm shadow-blue-200 dark:shadow-blue-900/30'
+                                                        : mode === 'beautify'
+                                                            ? 'bg-violet-600 border-violet-600 text-white hover:bg-violet-500 cursor-pointer shadow-sm shadow-violet-200 dark:shadow-violet-900/30'
+                                                            : 'bg-blue-600 border-blue-600 text-white hover:bg-blue-500 cursor-pointer shadow-sm shadow-blue-200 dark:shadow-blue-900/30'}`}>
+                                            {isProcessing
+                                                ? <Activity className="h-3.5 w-3.5 animate-pulse" />
+                                                : activeTab === 'dataflow'
+                                                    ? <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                                        <circle cx="3" cy="8" r="1.5"/><circle cx="13" cy="3" r="1.5"/><circle cx="13" cy="13" r="1.5"/>
+                                                        <path d="M4.4 7.3L11.6 3.7M4.4 8.7L11.6 12.3"/>
+                                                      </svg>
                                                     : mode === 'beautify'
-                                                        ? 'bg-violet-600 border-violet-600 text-white hover:bg-violet-500 cursor-pointer'
-                                                        : 'bg-blue-600 border-blue-600 text-white hover:bg-blue-500 cursor-pointer'}`}>
-                                            {isProcessing ? <Activity className="h-3.5 w-3.5 animate-pulse" /> : mode === 'beautify' ? <Wand2 className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 fill-current" />}
+                                                        ? <Wand2 className="h-3.5 w-3.5" />
+                                                        : <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h12M4 8h8M6 12h4"/></svg>}
                                         </button>
                                     </Tooltip>
                                     <Tooltip content="Upload SQL file" position="bottom-right">
-                                        <button onClick={()=>fileInputRef.current?.click()}
-                                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 shadow-sm transition-all whitespace-nowrap">
+                                        <button onClick={()=>fileInputRef.current?.click()} aria-label="Upload SQL file"
+                                            className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 shadow-sm transition-all whitespace-nowrap">
                                             <FileUp className="h-3.5 w-3.5" />
                                             <span className="hidden xl:inline">Upload</span>
                                         </button>
                                     </Tooltip>
                                     {inputText && (
                                         <Tooltip content="Clear all" position="bottom-right">
-                                            <button onClick={handleClear}
-                                                className="flex items-center justify-center p-1.5 rounded-md text-red-500 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20 transition-colors">
-                                                <Trash2 className="h-4 w-4" />
+                                            <button onClick={handleClear} aria-label="Clear all input"
+                                                className="flex items-center justify-center p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 dark:text-slate-500 dark:hover:text-red-400 dark:hover:bg-red-900/20 transition-all">
+                                                <Trash2 className="h-3.5 w-3.5" />
                                             </button>
                                         </Tooltip>
                                     )}
                                 </div>
                             </div>
-                            <div className="flex-1 overflow-hidden min-h-0">
+                            <div className="ln-editor">
+                                {/* Line number gutter — syncs scroll with textarea */}
+                                {(() => {
+                                    const lines = inputText ? inputText.split('\n') : [''];
+                                    return (
+                                        <div className="ln-gutter" ref={gutterRef}>
+                                            {lines.map((_, i) => (
+                                                <span key={i}>{i + 1}</span>
+                                            ))}
+                                            {/* Extra padding lines so gutter matches textarea scroll height */}
+                                            <span>&nbsp;</span>
+                                        </div>
+                                    );
+                                })()}
                                 <textarea
+                                    id="ln-textarea"
+                                    className="ln-textarea"
                                     value={inputText}
-                                    onChange={e=>{ inputTextRef.current = e.target.value; setInputText(e.target.value); }}
+                                    onChange={e=>{ inputTextRef.current = e.target.value; setInputText(e.target.value); resultCache.current = {}; dfLastRenderedRef.current = ''; }}
+                                    onKeyDown={e => {
+                                        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleProcess();
+                                        }
+                                    }}
+                                    onScroll={e => {
+                                        if (gutterRef.current) gutterRef.current.scrollTop = e.target.scrollTop;
+                                    }}
                                     placeholder={"-- Paste your SQL script here…\n-- Or drag & drop a .sql file onto this panel\n-- Press Ctrl+Enter (⌘↵) to minify or beautify"}
-                                    className="w-full h-full resize-none p-4 focus:outline-none font-fira text-sm leading-relaxed text-slate-800 dark:text-slate-300 bg-transparent placeholder-slate-400 dark:placeholder-slate-600"
                                     spellCheck="false"
                                 />
                             </div>
-                            <div className="shrink-0 h-8 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 text-xs text-slate-500 dark:text-slate-400">
-                                <span className="truncate max-w-xs">{inputText ? fileName : 'No file'}</span>
+                            <div className="shrink-0 h-7 bg-slate-50/80 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 text-xs text-slate-400 dark:text-slate-500">
+                                <span className="truncate max-w-xs font-medium text-slate-500 dark:text-slate-400">{inputText ? fileName : 'No file loaded'}</span>
                                 <span className="tabular-nums shrink-0">
-                                    {inputLines > 0 ? `${inputLines.toLocaleString()} ln · ` : ''}
+                                    {inputLines > 0 ? <><span className="text-slate-600 dark:text-slate-300 font-medium">{inputLines.toLocaleString()}</span> ln · </> : ''}
                                     {formatBytes(new Blob([inputText]).size)}
                                 </span>
                             </div>
@@ -1550,77 +2672,328 @@
 
                         {/* DIVIDER */}
                         <div
-                            className={`shrink-0 bg-slate-200 dark:bg-slate-800 hover:bg-blue-400 dark:hover:bg-blue-600 transition-colors z-10 flex items-center justify-center select-none
-                                ${isDesktop ? 'w-1.5 h-full cursor-col-resize' : 'h-1.5 w-full cursor-row-resize'}`}
-                            onMouseDown={()=>setIsDragging(true)}
+                            className={`shrink-0 group bg-slate-200 dark:bg-slate-800 hover:bg-blue-400 dark:hover:bg-blue-600 active:bg-blue-500 transition-colors z-10 flex items-center justify-center select-none
+                                ${isDesktop ? 'w-1 h-full cursor-col-resize' : 'h-1 w-full cursor-row-resize'}`}
+                            onMouseDown={()=>{ setIsDragging(true); userAdjustedSplit.current = true; }}
                             title="Drag to resize"
                         >
-                            <span className="text-slate-400 dark:text-slate-600 text-xs pointer-events-none">⋮</span>
+                            <span className={`text-slate-300 dark:text-slate-600 group-hover:text-blue-200 pointer-events-none text-[10px] leading-none ${isDesktop ? 'rotate-90' : ''}`}>⋮⋮</span>
                         </div>
 
-                        {/* RIGHT — Output */}
-                        <div className="flex flex-col overflow-hidden bg-white dark:bg-slate-900" style={rightStyle}>
-                            <div className="shrink-0 h-12 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between px-3">
-                                <div className="flex items-center gap-2">
+                        {/* RIGHT — Data Flow Canvas (always mounted to preserve state) */}
+                        <div className="flex flex-col overflow-hidden border-l border-slate-200 dark:border-slate-700" style={{...rightStyle, background:'#f8f7f6', display: activeTab === 'dataflow' ? 'flex' : 'none'}}>
+                            {/* Header — tabs only, no toolbar buttons so it never overflows */}
+                            <div className="shrink-0 h-11 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center px-2 gap-1">
+                                <div className="flex items-center gap-0.5 bg-slate-200/80 dark:bg-slate-700/80 rounded-lg p-0.5">
+                                    <Tooltip content="Minify SQL" position="bottom-left">
+                                        <button onClick={()=>{ handleModeSwitch('minify'); setActiveTab('editor'); }}
+                                            aria-label="Minify mode"
+                                            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-all">
+                                            <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h12M4 8h8M6 12h4"/></svg>
+                                            <span className="hidden sm:inline">Minify</span>
+                                        </button>
+                                    </Tooltip>
+                                    <Tooltip content="Beautify SQL" position="bottom-left">
+                                        <button onClick={()=>{ handleModeSwitch('beautify'); setActiveTab('editor'); }}
+                                            aria-label="Beautify mode"
+                                            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-all">
+                                            <Wand2 className="h-3 w-3 shrink-0"/>
+                                            <span className="hidden sm:inline">Beautify</span>
+                                        </button>
+                                    </Tooltip>
+                                    <Tooltip content="Data Flow canvas" position="bottom-left">
+                                        <button className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm transition-all">
+                                            <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                                <circle cx="3" cy="8" r="1.5"/>
+                                                <circle cx="13" cy="3" r="1.5"/>
+                                                <circle cx="13" cy="13" r="1.5"/>
+                                                <path d="M4.4 7.3L11.6 3.7M4.4 8.7L11.6 12.3"/>
+                                            </svg>
+                                            <span className="hidden sm:inline">Data Flow</span>
+                                        </button>
+                                    </Tooltip>
+                                </div>
+                                <div className="ml-auto flex items-center gap-1 pr-1">
+                                    <Tooltip content="Download diagram as PNG" position="bottom-right">
+                                        <button onClick={()=>dfEngineRef.current?.exportPNG()} disabled={dfEmpty}
+                                            className="flex items-center justify-center w-7 h-7 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 shadow-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed">
+                                            <Download className="h-3.5 w-3.5" />
+                                        </button>
+                                    </Tooltip>
+                                </div>
+                            </div>
+
+                            {/* Canvas area */}
+                            <div className="flex-1 relative overflow-hidden" style={{background:'#f8f7f6'}}>
+                                <canvas ref={dfCanvasElRef} style={{position:'absolute',top:0,left:0,zIndex:1,cursor:'default',display:'block'}}/>
+
+                                {/* Empty state */}
+                                {dfEmpty && (
+                                <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',textAlign:'center',pointerEvents:'none',zIndex:5}}>
+                                    <div style={{width:64,height:64,margin:'0 auto 12px',background:'#fff',border:'1px solid #e1dfdd',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 1.6px 3.6px rgba(0,0,0,.12)'}}>
+                                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0078d4" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" style={{opacity:.28}}>
+                                            <rect x="2" y="3" width="8" height="5" rx="1.5"/><rect x="14" y="3" width="8" height="5" rx="1.5"/><rect x="8" y="16" width="8" height="5" rx="1.5"/>
+                                            <path d="M6 8v4a2 2 0 002 2h8a2 2 0 002-2V8"/><path d="M12 14v2"/>
+                                        </svg>
+                                    </div>
+                                    <p style={{fontSize:15,fontWeight:600,color:'#605e5c',marginBottom:4}}>No diagram yet</p>
+                                    <p style={{fontSize:12,color:'#a19f9d',maxWidth:200,margin:'0 auto',lineHeight:1.6}}>Drop a .sql file or paste SQL and press Draw</p>
+                                </div>
+                                )}
+
+                                {/* Minimap */}
+                                <div style={{position:'absolute',bottom:14,right:14,width:160,height:110,background:'rgba(255,255,255,.92)',border:'1px solid #e1dfdd',borderRadius:4,boxShadow:'0 1.6px 3.6px rgba(0,0,0,.12)',zIndex:10,overflow:'hidden',display:dfEmpty?'none':'block'}}>
+                                    <canvas ref={dfMmCanvasRef} style={{display:'block'}}/>
+                                </div>
+
+                                {/* Canvas toolbar — always visible, floats bottom-right above minimap */}
+                                <div style={{position:'absolute',bottom: dfEmpty ? 14 : 132,right:14,zIndex:12,background:'#fff',border:'1px solid #e1dfdd',borderRadius:6,boxShadow:'0 1.6px 3.6px rgba(0,0,0,.1)',display:'flex',flexDirection:'column',overflow:'visible'}}>
+                                    {/* Fit */}
+                                    <Tooltip content="Fit to screen (reset zoom)" position="left">
+                                        <button onClick={()=>dfEngineRef.current?.fitView()}
+                                            style={{width:30,height:30,display:'flex',alignItems:'center',justifyContent:'center',background:'transparent',border:'none',cursor:'pointer',color:'#605e5c'}}
+                                            onMouseEnter={e=>{e.currentTarget.style.background='#f3f2f1';e.currentTarget.style.color='#201f1e';}} onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='#605e5c';}}>
+                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 5V2h3M12 2h3v3M15 11v3h-3M4 14H1v-3"/><rect x="4" y="4" width="8" height="8" rx="1"/></svg>
+                                        </button>
+                                    </Tooltip>
+                                    {/* Pan */}
+                                    <Tooltip content="Pan mode — click & drag to scroll canvas" position="left">
+                                        <button onClick={()=>{ const on=dfEngineRef.current?.togglePan(); setDfPanActive(!!on); }}
+                                            style={{width:30,height:30,display:'flex',alignItems:'center',justifyContent:'center',background:dfPanActive?'#deecf9':'transparent',border:'none',cursor:'pointer',color:dfPanActive?'#0078d4':'#605e5c'}}
+                                            onMouseEnter={e=>{if(!dfPanActive){e.currentTarget.style.background='#f3f2f1';e.currentTarget.style.color='#201f1e';}}} onMouseLeave={e=>{if(!dfPanActive){e.currentTarget.style.background='transparent';e.currentTarget.style.color='#605e5c';}}}>
+                                            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5.5 3.5V9"/><path d="M5.5 3.5a1 1 0 011-1v0a1 1 0 011 1V7"/><path d="M7.5 7V3.5a1 1 0 011-1v0a1 1 0 011 1V7"/><path d="M9.5 7V5a1 1 0 011-1v0a1 1 0 011 1v3.5c0 2.5-1.5 4-3.5 4h-.5A3.5 3.5 0 014 9V7a1 1 0 011-1v0a1 1 0 011 1"/></svg>
+                                        </button>
+                                    </Tooltip>
+                                    <div style={{height:1,background:'#e1dfdd',margin:'0 4px'}}/>
+                                    {/* Zoom in */}
+                                    <Tooltip content="Zoom in (scroll wheel up)" position="left">
+                                        <button onClick={()=>dfEngineRef.current?.doZoom(1.2)}
+                                            style={{width:30,height:28,display:'flex',alignItems:'center',justifyContent:'center',background:'transparent',border:'none',cursor:'pointer',color:'#605e5c',fontSize:17,fontWeight:600,lineHeight:1}}
+                                            onMouseEnter={e=>{e.currentTarget.style.background='#f3f2f1';e.currentTarget.style.color='#201f1e';}} onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='#605e5c';}}>+</button>
+                                    </Tooltip>
+                                    <span ref={dfZoomPctRef} style={{width:30,height:20,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:'#605e5c',fontFamily:'Consolas,monospace',userSelect:'none'}}>100%</span>
+                                    {/* Zoom out */}
+                                    <Tooltip content="Zoom out (scroll wheel down)" position="left">
+                                        <button onClick={()=>dfEngineRef.current?.doZoom(.83)}
+                                            style={{width:30,height:28,display:'flex',alignItems:'center',justifyContent:'center',background:'transparent',border:'none',cursor:'pointer',color:'#605e5c',fontSize:17,fontWeight:600,lineHeight:1}}
+                                            onMouseEnter={e=>{e.currentTarget.style.background='#f3f2f1';e.currentTarget.style.color='#201f1e';}} onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='#605e5c';}}>−</button>
+                                    </Tooltip>
+                                    <div style={{height:1,background:'#e1dfdd',margin:'0 4px'}}/>
+                                    {/* Undo */}
+                                    <Tooltip content="Undo node move (Ctrl+Z)" position="left">
+                                        <button onClick={()=>dfEngineRef.current?.undoMove()} disabled={!dfUndoState.u}
+                                            style={{width:30,height:28,display:'flex',alignItems:'center',justifyContent:'center',background:'transparent',border:'none',cursor:dfUndoState.u?'pointer':'not-allowed',color:'#605e5c',opacity:dfUndoState.u?1:0.3}}
+                                            onMouseEnter={e=>{if(dfUndoState.u){e.currentTarget.style.background='#f3f2f1';e.currentTarget.style.color='#201f1e';}}} onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='#605e5c';}}>
+                                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M2 6h7a4 4 0 010 8H5"/><path d="M2 6l3-3-3 3 3 3-3-3z"/></svg>
+                                        </button>
+                                    </Tooltip>
+                                    {/* Redo */}
+                                    <Tooltip content="Redo node move (Ctrl+Y)" position="left">
+                                        <button onClick={()=>dfEngineRef.current?.redoMove()} disabled={!dfUndoState.r}
+                                            style={{width:30,height:28,display:'flex',alignItems:'center',justifyContent:'center',background:'transparent',border:'none',cursor:dfUndoState.r?'pointer':'not-allowed',color:'#605e5c',opacity:dfUndoState.r?1:0.3}}
+                                            onMouseEnter={e=>{if(dfUndoState.r){e.currentTarget.style.background='#f3f2f1';e.currentTarget.style.color='#201f1e';}}} onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='#605e5c';}}>
+                                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M14 6H7a4 4 0 000 8h4"/><path d="M14 6l-3-3 3 3-3 3 3-3z"/></svg>
+                                        </button>
+                                    </Tooltip>
+
+                                </div>
+
+                                {/* Node Detail Panel — slides in from right on node click */}
+                                {dfNodeDetail && (function(){
+                                    const TH_COLORS={
+                                        source:  {bg:'#deecf9',border:'#0078d4',label:'BASE TABLE', icon:'⊞'},
+                                        temp:    {bg:'#fce4d6',border:'#ca5010',label:'TEMP TABLE', icon:'⚙'},
+                                        transform:{bg:'#ede4f5',border:'#5c2d91',label:'CTE',        icon:'◈'},
+                                        target:  {bg:'#dff6dd',border:'#107c10',label:'TARGET',     icon:'▤'},
+                                        control: {bg:'#d2f0ed',border:'#008272',label:'CONTROL',    icon:'◎'},
+                                    };
+                                    const {node:n, ins, outs} = dfNodeDetail;
+                                    const th = TH_COLORS[n.type] || TH_COLORS.source;
+                                    const displayName = n.label.replace(/\n/g, '.').trim();
+                                    return (
+                                        <div style={{
+                                            position:'absolute',top:10,right:12,width:240,
+                                            background:'#fff',border:'1px solid #e1dfdd',borderRadius:6,
+                                            boxShadow:'0 6px 16px rgba(0,0,0,.13),0 1px 4px rgba(0,0,0,.08)',
+                                            zIndex:20,overflow:'hidden',
+                                            animation:'detailSlideIn .15s ease-out',
+                                        }}>
+                                            {/* Header */}
+                                            <div style={{padding:'8px 10px 7px',borderBottom:'1px solid #e1dfdd',display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:6}}>
+                                                <div style={{minWidth:0}}>
+                                                    <div style={{fontSize:12,fontWeight:700,color:'#201f1e',wordBreak:'break-all',lineHeight:1.4,marginBottom:4}}>{displayName}</div>
+                                                    <span style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:9,fontWeight:700,padding:'2px 7px',borderRadius:10,background:th.bg,color:th.border,letterSpacing:'.04em',textTransform:'uppercase'}}>
+                                                        <span style={{fontSize:11,lineHeight:1}}>{th.icon}</span>{th.label}
+                                                    </span>
+                                                </div>
+                                                <button onClick={()=>setDfNodeDetail(null)}
+                                                    style={{flexShrink:0,background:'transparent',border:'none',cursor:'pointer',color:'#a19f9d',fontSize:14,lineHeight:1,padding:'1px 2px',marginTop:1}}
+                                                    onMouseEnter={e=>e.target.style.color='#201f1e'} onMouseLeave={e=>e.target.style.color='#a19f9d'}>✕</button>
+                                            </div>
+                                            {/* Body */}
+                                            <div style={{padding:'8px 10px',fontSize:11.5,color:'#605e5c',lineHeight:1.7,maxHeight:320,overflowY:'auto'}}>
+                                                {n.schema && (
+                                                    <div style={{marginBottom:8}}>
+                                                        <div style={{fontSize:9,fontWeight:700,color:'#a19f9d',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:3}}>Schema</div>
+                                                        <span style={{display:'inline-block',padding:'1px 7px',borderRadius:3,background:th.bg,color:th.border,fontSize:10.5,fontFamily:'Consolas,monospace'}}>{n.schema}</span>
+                                                    </div>
+                                                )}
+                                                {ins.length > 0 && (
+                                                    <div style={{marginBottom:8}}>
+                                                        <div style={{fontSize:9,fontWeight:700,color:'#a19f9d',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4}}>Reads from ({ins.length})</div>
+                                                        <div style={{display:'flex',flexWrap:'wrap',gap:'3px 4px'}}>
+                                                        {ins.map((ed,i)=>{
+                                                            const frType = ed._fromType || 'source';
+                                                            const fc = TH_COLORS[frType]?.border || '#666';
+                                                            const fbg = TH_COLORS[frType]?.bg || '#f3f2f1';
+                                                            const lbl = ed.from.split('.').pop();
+                                                            return <span key={i} style={{display:'inline-block',padding:'1px 6px',borderRadius:3,background:fbg,color:fc,fontSize:10.5,fontFamily:'Consolas,monospace',lineHeight:1.6}}>{lbl}{ed.label ? ' · '+ed.label : ''}</span>;
+                                                        })}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {outs.length > 0 && (
+                                                    <div style={{marginBottom:4}}>
+                                                        <div style={{fontSize:9,fontWeight:700,color:'#a19f9d',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4}}>Writes to ({outs.length})</div>
+                                                        <div style={{display:'flex',flexWrap:'wrap',gap:'3px 4px'}}>
+                                                        {outs.map((ed,i)=>{
+                                                            const toType = ed._toType || 'target';
+                                                            const tc = TH_COLORS[toType]?.border || '#666';
+                                                            const tbg = TH_COLORS[toType]?.bg || '#f3f2f1';
+                                                            const lbl = ed.to.split('.').pop();
+                                                            return <span key={i} style={{display:'inline-block',padding:'1px 6px',borderRadius:3,background:tbg,color:tc,fontSize:10.5,fontFamily:'Consolas,monospace',lineHeight:1.6}}>{lbl}{ed.label ? ' · '+ed.label : ''}</span>;
+                                                        })}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {!n.schema && !ins.length && !outs.length && (
+                                                    <span style={{color:'#a19f9d',fontSize:11}}>No connections found</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* Legend */}
+                                <div style={{position:'absolute',bottom:14,left:12,zIndex:10,display:dfEmpty?'none':'flex',gap:10,flexWrap:'wrap'}}>
+                                    {[['#0078d4','⊞','Base Table'],['#ca5010','⚙','Temp Table'],['#5c2d91','◈','CTE'],['#107c10','▤','Target'],['#008272','◎','Control']].map(([c,icon,l])=>(
+                                        <div key={l} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:'#605e5c',background:'rgba(255,255,255,.85)',padding:'2px 7px',borderRadius:4,border:'1px solid #e1dfdd'}}>
+                                            <span style={{fontSize:12,color:c,lineHeight:1}}>{icon}</span>
+                                            {l}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Status bar */}
+                            <div className="shrink-0 border-t border-slate-200 dark:border-slate-700 bg-white flex items-center px-3 text-xs gap-2 overflow-x-auto" style={{color:'#605e5c', height: dfStatus.n > 0 ? 'auto' : '2rem', minHeight:'2rem', paddingTop: dfStatus.n > 0 ? '5px' : undefined, paddingBottom: dfStatus.n > 0 ? '5px' : undefined, flexWrap:'wrap'}}>
+                                {dfStatus.err ? (
+                                    <span style={{color:'#a4262c'}}>{dfStatus.text}</span>
+                                ) : dfStatus.n > 0 ? (
+                                    <>
+                                        {[
+                                            {label:'Nodes', val:dfStatus.n, color:'#1e293b'},
+                                            {label:'Edges', val:dfStatus.e, color:'#1e293b'},
+                                            {label:'Base Tables', val:dfStatus.types?.source, color:'#0078d4'},
+                                            {label:'Temp Tables', val:dfStatus.types?.temp, color:'#ca5010'},
+                                            {label:'CTEs', val:dfStatus.types?.transform, color:'#5c2d91'},
+                                            {label:'Targets', val:dfStatus.types?.target, color:'#107c10'},
+                                            {label:'Control', val:dfStatus.types?.control, color:'#008272'},
+                                        ].filter(item => item.val > 0).map((item, i, arr) => (
+                                            <React.Fragment key={item.label}>
+                                                <span style={{whiteSpace:'nowrap'}}>
+                                                    {item.label}:{' '}
+                                                    <strong style={{color: item.color}}>{item.val}</strong>
+                                                </span>
+                                                {i < arr.length - 1 && <span style={{color:'#d1d5db', userSelect:'none'}}>·</span>}
+                                            </React.Fragment>
+                                        ))}
+                                    </>
+                                ) : null}
+                            </div>
+                        </div>
+
+                        {/* RIGHT — Editor Output (always mounted, hidden when on dataflow tab) */}
+                        <div className="flex flex-col overflow-hidden bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800" style={{...rightStyle, display: activeTab === 'dataflow' ? 'none' : 'flex'}}>
+                            <div className="shrink-0 h-11 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between px-2">
+                                <div className="flex items-center gap-1 shrink-0">
                                     {/* Mode toggle pills */}
-                                    <div className="flex items-center gap-0.5 bg-slate-200 dark:bg-slate-700 rounded-lg p-0.5">
+                                    <div className="flex items-center gap-0.5 bg-slate-200/80 dark:bg-slate-700/80 rounded-lg p-0.5">
                                         <Tooltip content="Minify SQL — strip whitespace & comments" position="bottom-left">
-                                            <button onClick={()=>handleModeSwitch('minify')}
-                                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
-                                                    mode === 'minify'
+                                            <button onClick={()=>{ handleModeSwitch('minify'); setActiveTab('editor'); }}
+                                                aria-label="Minify mode"
+                                                className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold transition-all ${
+                                                    mode === 'minify' && activeTab === 'editor'
                                                         ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
                                                         : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                                                 }`}>
-                                                <Zap className="h-3 w-3" />
-                                                Minify
+                                                <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h12M4 8h8M6 12h4"/></svg>
+                                                <span className="hidden sm:inline">Minify</span>
                                             </button>
                                         </Tooltip>
                                         <Tooltip content="Beautify SQL — format with indentation" position="bottom-left">
-                                            <button onClick={()=>handleModeSwitch('beautify')}
-                                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
-                                                    mode === 'beautify'
+                                            <button onClick={()=>{ handleModeSwitch('beautify'); setActiveTab('editor'); }}
+                                                aria-label="Beautify mode"
+                                                className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold transition-all ${
+                                                    mode === 'beautify' && activeTab === 'editor'
                                                         ? 'bg-white dark:bg-slate-900 text-violet-600 dark:text-violet-400 shadow-sm'
                                                         : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                                                 }`}>
-                                                <Wand2 className="h-3 w-3" />
-                                                Beautify
+                                                <Wand2 className="h-3 w-3 shrink-0" />
+                                                <span className="hidden sm:inline">Beautify</span>
+                                            </button>
+                                        </Tooltip>
+                                        <Tooltip content="Visualise SQL data flow on canvas" position="bottom-left">
+                                            <button onClick={()=>{ const next = activeTab === 'dataflow' ? 'editor' : 'dataflow'; if (next === 'dataflow' && !userAdjustedSplit.current && inputTextRef.current.trim()) setSplitPct(20); setActiveTab(next); }}
+                                                aria-label="Data flow view"
+                                                className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold transition-all ${
+                                                    activeTab === 'dataflow'
+                                                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
+                                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                                                }`}>
+                                                <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                                    <circle cx="3" cy="8" r="1.5"/>
+                                                    <circle cx="13" cy="3" r="1.5"/>
+                                                    <circle cx="13" cy="13" r="1.5"/>
+                                                    <path d="M4.4 7.3L11.6 3.7M4.4 8.7L11.6 12.3"/>
+                                                </svg>
+                                                <span className="hidden sm:inline">Data Flow</span>
                                             </button>
                                         </Tooltip>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-0.5 shrink-0">
                                     {mode === 'minify' && (
-                                    <div className="flex items-center gap-1.5">
-                                        <Tooltip content="Auto-generate aliases for tables including UPDATE target (Redshift-compatible)" position="bottom-right">
-                                            <label className="flex items-center gap-1 cursor-pointer px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors whitespace-nowrap">
-                                                <input type="checkbox" checked={autoAlias} onChange={e=>setAutoAlias(e.target.checked)} className="w-3 h-3 rounded accent-blue-600" />
-                                                <Settings2 className="h-3 w-3 text-slate-500 dark:text-slate-400" />
-                                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400 hidden lg:inline">Auto-Alias</span>
+                                    <div className="flex items-center gap-0.5">
+                                        <Tooltip content="Auto-generate aliases for tables (Redshift-compatible)" position="bottom-right">
+                                            <label className="flex items-center gap-1 cursor-pointer px-1.5 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                                                <input type="checkbox" checked={autoAlias} onChange={e=>setAutoAlias(e.target.checked)} className="w-3 h-3 rounded accent-blue-600 shrink-0" />
+                                                <Settings2 className="h-3 w-3 text-slate-500 dark:text-slate-400 shrink-0" />
+                                                {splitPct < 65 && <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">Auto Alias</span>}
                                             </label>
                                         </Tooltip>
                                         <Tooltip content="Output as a single line (removes all newlines)" position="bottom-right">
-                                            <label className="flex items-center gap-1 cursor-pointer px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors whitespace-nowrap">
-                                                <input type="checkbox" checked={removeNL} onChange={e=>setRemoveNL(e.target.checked)} className="w-3 h-3 rounded accent-purple-600" />
-                                                <Zap className="h-3 w-3 text-slate-500 dark:text-slate-400" />
-                                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400 hidden lg:inline">Single Line</span>
+                                            <label className="flex items-center gap-1 cursor-pointer px-1.5 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                                                <input type="checkbox" checked={removeNL} onChange={e=>setRemoveNL(e.target.checked)} className="w-3 h-3 rounded accent-purple-600 shrink-0" />
+                                                <svg className="h-3 w-3 shrink-0 text-slate-500 dark:text-slate-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 5h12M2 8h12M2 11h12"/><path d="M13 7l2 1-2 1"/></svg>
+                                                {splitPct < 65 && <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">Single Line</span>}
                                             </label>
                                         </Tooltip>
-                                        <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 shrink-0" />
+                                        <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 shrink-0 mx-0.5" />
                                     </div>
                                     )}
                                     <Tooltip content={copied ? 'Copied!' : 'Copy to clipboard'} position="bottom-right">
-                                        <button onClick={handleCopy} disabled={!outputText}
-                                            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed
+                                        <button onClick={handleCopy} disabled={!outputText} aria-label="Copy to clipboard"
+                                            className={`flex items-center justify-center w-7 h-7 rounded-md border shadow-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed
                                                 ${copied
-                                                    ? 'border-emerald-400 text-emerald-600 bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 dark:bg-emerald-900/20'
-                                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'}`}>
+                                                    ? 'border-emerald-400 text-emerald-700 bg-emerald-50 dark:border-emerald-600 dark:text-emerald-400 dark:bg-emerald-900/20'
+                                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
                                             {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                                            {copied ? 'Copied!' : 'Copy'}
                                         </button>
                                     </Tooltip>
-                                    <Tooltip content={mode === 'beautify' ? 'Download beautified SQL file' : 'Download minified SQL file'} position="bottom-right">
-                                        <button onClick={handleDownload} disabled={!outputText}
-                                            className="flex items-center justify-center p-1.5 rounded-md bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                                    <Tooltip content={mode === 'beautify' ? 'Download .fmt.sql' : 'Download .min.sql'} position="bottom-right">
+                                        <button onClick={handleDownload} disabled={!outputText} aria-label="Download SQL file"
+                                            className="flex items-center justify-center w-7 h-7 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 shadow-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed">
                                             <Download className="h-3.5 w-3.5" />
                                         </button>
                                     </Tooltip>
@@ -1645,13 +3018,13 @@
 
                             {/* STATS PANEL */}
                             {mode === 'minify' && stats && outputText && showReport && (
-                                <div className="shrink-0 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 overflow-y-auto max-h-64 stats-reveal">
+                                <div className="shrink-0 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 overflow-y-auto stats-reveal" style={{maxHeight:'min(16rem, 40vh)'}}>
                                     <div className="px-3 pt-2.5 pb-2">
                                         <div className="flex items-center gap-1.5 mb-2">
                                             <Activity className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400" />
                                             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Minification Report</span>
                                         </div>
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5 mb-2">
+                                        <div className="grid grid-cols-3 gap-1.5 mb-2">
                                             {[
                                                 { label:'Original Size',     val:formatBytes(stats.originalSize),  cls:'text-slate-700 dark:text-slate-300' },
                                                 { label:'Minified Size',     val:formatBytes(stats.minifiedSize),  cls:'text-emerald-600 dark:text-emerald-400' },
@@ -1659,12 +3032,12 @@
                                                 { label:'Original Lines',    val:stats.originalLines.toLocaleString(), cls:'text-slate-700 dark:text-slate-300' },
                                                 { label:'Output Lines',      val:stats.minifiedLines.toLocaleString(), cls:'text-blue-600 dark:text-blue-400' },
                                                 { label:'Lines Removed',     val:`${(stats.originalLines-stats.minifiedLines).toLocaleString()} (${stats.lineReduction}%)`, cls:'text-purple-600 dark:text-purple-400' },
-                                                { label:'Original Chars',    val:stats.originalChars.toLocaleString(), cls:'text-slate-700 dark:text-slate-300', md:true },
-                                                { label:'Output Chars',      val:stats.minifiedChars.toLocaleString(), cls:'text-blue-600 dark:text-blue-400', md:true },
+                                                { label:'Original Chars',    val:stats.originalChars.toLocaleString(), cls:'text-slate-700 dark:text-slate-300' },
+                                                { label:'Output Chars',      val:stats.minifiedChars.toLocaleString(), cls:'text-blue-600 dark:text-blue-400' },
                                                 { label:'Comments Stripped', val:`${stats.totalComments} (${stats.singleLineComments}-- / ${stats.multiLineComments}/**/)`, cls:'text-orange-600 dark:text-orange-400' },
-                                            ].map(({label,val,cls,accent,md}) => (
-                                                <div key={label} className={`${md?'hidden md:block':''} ${accent?'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800':'bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-700'} border rounded-md px-2.5 py-1.5`}>
-                                                    <div className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">{label}</div>
+                                            ].map(({label,val,cls,accent}) => (
+                                                <div key={label} className={`${accent?'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800':'bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-700'} border rounded-md px-2.5 py-1.5`}>
+                                                    <div className="text-[10px] text-slate-400 dark:text-slate-500 mb-0.5">{label}</div>
                                                     <div className={`text-xs font-semibold ${cls}`}>{val}</div>
                                                 </div>
                                             ))}
@@ -1673,47 +3046,45 @@
                                             <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-700"
                                                 style={{width:`${parseFloat(stats.reduction)}%`}} />
                                         </div>
-                                        <div className="flex justify-between text-xs text-slate-400 dark:text-slate-600">
+                                        <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-600">
                                             <span>0%</span>
+                                            <span className="font-medium text-emerald-600 dark:text-emerald-400">{stats.reduction}% saved</span>
                                             <span>100%</span>
                                         </div>
                                     </div>
                                 </div>
                             )}
 
-                            <div className="shrink-0 h-8 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 grid grid-cols-3 items-center px-3 text-xs text-slate-500 dark:text-slate-400">
+                            <div className="shrink-0 h-7 bg-slate-50/80 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 grid grid-cols-3 items-center px-3 text-xs text-slate-400 dark:text-slate-500">
                                 {mode === 'minify'
-                                    ? <span>Final: {stats ? formatBytes(stats.minifiedSize) : '—'}</span>
-                                    : <span>Output: {outputText ? `${outputText.split('\n').filter(l=>l.trim()).length} lines` : '—'}</span>
+                                    ? <span className="tabular-nums">{stats ? <><span className="text-emerald-600 dark:text-emerald-400 font-medium">{formatBytes(stats.minifiedSize)}</span> final</> : '—'}</span>
+                                    : <span className="tabular-nums">{outputText ? <><span className="text-slate-600 dark:text-slate-300 font-medium">{outputText.split('\n').filter(l=>l.trim()).length}</span> lines</> : '—'}</span>
                                 }
                                 {mode === 'minify' && stats && (
-                                    <Tooltip content={showReport ? 'Hide minification report' : 'Show minification report'} position="top">
-                                        <button onClick={()=>setShowReport(v=>!v)}
-                                            className={`justify-self-center flex items-center gap-1.5 px-2.5 py-0.5 rounded-full transition-all cursor-pointer hover:scale-105 active:scale-95 ${
+                                    <Tooltip content={showReport ? 'Hide report' : 'Show minification report'} position="top">
+                                        <button onClick={()=>setShowReport(v=>!v)} aria-label="Toggle minification report"
+                                            className={`justify-self-center flex items-center gap-1.5 px-2 py-0.5 rounded-full transition-all cursor-pointer hover:scale-105 active:scale-95 ${
                                                 showReport
                                                     ? 'bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700'
-                                                    : 'border border-transparent'
+                                                    : 'border border-transparent hover:border-slate-200 dark:hover:border-slate-700'
                                             }`}>
-                                            <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full transition-all shadow-sm ${
+                                            <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full transition-all ${
                                                 showReport
-                                                    ? 'bg-gradient-to-br from-yellow-300 to-amber-400 dark:from-amber-500 dark:to-amber-600 border border-amber-300 dark:border-amber-500'
-                                                    : 'bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:border-amber-300 dark:hover:border-amber-500'
+                                                    ? 'bg-gradient-to-br from-yellow-300 to-amber-400 dark:from-amber-500 dark:to-amber-600'
+                                                    : 'bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600'
                                             }`}>
-                                                <Lightbulb className={`h-3 w-3 transition-all ${
+                                                <Lightbulb className={`h-2.5 w-2.5 transition-all ${
                                                     showReport
                                                         ? 'text-amber-700 dark:text-amber-100 fill-amber-500 dark:fill-amber-300'
                                                         : 'text-slate-400 dark:text-slate-500'
                                                 }`} />
                                             </span>
-                                            <span className={`text-xs font-semibold tabular-nums transition-colors ${
-                                                showReport
-                                                    ? 'text-amber-700 dark:text-amber-200'
-                                                    : 'text-emerald-600 dark:text-emerald-400'
+                                            <span className={`text-xs font-semibold tabular-nums ${
+                                                showReport ? 'text-amber-700 dark:text-amber-200' : 'text-emerald-600 dark:text-emerald-400'
                                             }`}>{stats.reduction}% saved</span>
                                         </button>
                                     </Tooltip>
                                 )}
-
                             </div>
                         </div>
 
