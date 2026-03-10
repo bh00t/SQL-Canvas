@@ -1407,6 +1407,7 @@ self.addEventListener('fetch', e => {
             const [dfUndoState,  setDfUndoState]  = useState({u:false,r:false});
             const [dfPanActive,  setDfPanActive]  = useState(false);
             const [dfNodeDetail, setDfNodeDetail] = useState(null); // {node, ins, outs} or null
+            const [dfLayoutDir,  setDfLayoutDir]  = useState('LR'); // 'LR' = left-to-right, 'TB' = top-to-bottom
             const canvasRef      = useRef(null);
             const dfCanvasRef    = useRef(null);
             const prevSplitPct   = useRef(50); // remembers user's split before entering dataflow
@@ -1728,34 +1729,53 @@ self.addEventListener('fetch', e => {
                 }
 
                 // ── Layout ──
-                function schemaGroupLayout(){
+                function schemaGroupLayout(dir){
+                    const TB=(dir||'LR')==='TB';
+                    // LR: nodes spread horizontally across columns, TB: nodes spread vertically across rows
                     const NODE_H=NH+52;
-                    const BASE_COL_W=NW+140;
-                    const MIN_COL_GAP=50;
+                    const NODE_W=NW+140; // cross-axis spacing
+                    const BASE_MAIN_GAP=TB?(NH+120):(NW+140); // main-axis (col) spacing
+                    const BASE_CROSS_GAP=TB?(NW+80):(NH+52);  // cross-axis (row) spacing
+                    const MIN_MAIN_GAP=50;
                     const byCol={};
                     nodes.forEach(n=>{(byCol[n.col]=byCol[n.col]||[]).push(n);});
                     const colKeys=Object.keys(byCol).map(Number).sort((a,b)=>a-b);
-                    const colH={};colKeys.forEach(col=>{const ns=byCol[col];colH[col]=ns.length*NODE_H+Math.max(0,ns.length-1)*4;});
+                    // cross-axis sizes per column
+                    const colH={};colKeys.forEach(col=>{const ns=byCol[col];colH[col]=ns.length*BASE_CROSS_GAP+Math.max(0,ns.length-1)*4;});
                     const colBulge={};colKeys.forEach(col=>{const N=byCol[col].length;colBulge[col]=N>2?N*13:0;});
+                    // main-axis positions per column
                     const colX={};colX[colKeys[0]]=colBulge[colKeys[0]];
-                    for(let i=1;i<colKeys.length;i++){const prev=colKeys[i-1],cur=colKeys[i];const maxH=Math.max(colH[prev],colH[cur]);const gap=BASE_COL_W+Math.max(0,(maxH-300)*0.15)+MIN_COL_GAP+colBulge[cur];colX[cur]=colX[prev]+gap;}
+                    for(let i=1;i<colKeys.length;i++){const prev=colKeys[i-1],cur=colKeys[i];const maxH=Math.max(colH[prev],colH[cur]);const gap=BASE_MAIN_GAP+Math.max(0,(maxH-300)*0.15)+MIN_MAIN_GAP+colBulge[cur];colX[cur]=colX[prev]+gap;}
                     const xs=colKeys.map(c=>colX[c]);const midX=(Math.min(...xs)+Math.max(...xs))/2;colKeys.forEach(col=>{colX[col]-=midX;});
                     colKeys.forEach(col=>{
                         const ns=byCol[col],N=ns.length,mb=colBulge[col],cx=colX[col],tot=colH[col];
-                        let curY=-tot/2;
-                        ns.forEach((nd,i)=>{const t=N>1?(i/(N-1))*2-1:0;nd.x=cx-mb*Math.sqrt(1-t*t);nd.y=curY;curY+=NODE_H+4;});
+                        let cur=-tot/2;
+                        ns.forEach((nd,i)=>{
+                            const t=N>1?(i/(N-1))*2-1:0;
+                            if(TB){nd.y=cx-mb*Math.sqrt(1-t*t);nd.x=cur;}
+                            else  {nd.x=cx-mb*Math.sqrt(1-t*t);nd.y=cur;}
+                            cur+=BASE_CROSS_GAP+4;
+                        });
                     });
                     colKeys.forEach(col=>{
                         const ns=byCol[col];if(ns.length<2)return;
                         ns.forEach(nd=>{
-                            const ys=[];
-                            edges.forEach(e=>{if(e.from===nd.id){const t=nodeMap[e.to];if(t&&t.col!==col)ys.push(t.y);}if(e.to===nd.id){const f=nodeMap[e.from];if(f&&f.col!==col)ys.push(f.y);}});
-                            nd._grav=ys.length?ys.reduce((a,b)=>a+b,0)/ys.length:nd.y;
+                            const vs=[];
+                            edges.forEach(e=>{
+                                if(e.from===nd.id){const t=nodeMap[e.to];if(t&&t.col!==col)vs.push(TB?t.x:t.y);}
+                                if(e.to===nd.id){const f=nodeMap[e.from];if(f&&f.col!==col)vs.push(TB?f.x:f.y);}
+                            });
+                            nd._grav=vs.length?vs.reduce((a,b)=>a+b,0)/vs.length:(TB?nd.x:nd.y);
                         });
                         ns.sort((a,b)=>a._grav-b._grav);
                         const tot=colH[col],N=ns.length,mb=colBulge[col],cx=colX[col];
-                        let curY=-tot/2;
-                        ns.forEach((nd,i)=>{const t=N>1?(i/(N-1))*2-1:0;nd.x=cx-mb*Math.sqrt(1-t*t);nd.y=curY;curY+=NODE_H+4;});
+                        let cur=-tot/2;
+                        ns.forEach((nd,i)=>{
+                            const t=N>1?(i/(N-1))*2-1:0;
+                            if(TB){nd.y=cx-mb*Math.sqrt(1-t*t);nd.x=cur;}
+                            else  {nd.x=cx-mb*Math.sqrt(1-t*t);nd.y=cur;}
+                            cur+=BASE_CROSS_GAP+4;
+                        });
                     });
                     for(let pass=0;pass<10;pass++){
                         const order=pass%2===0?[...colKeys]:[...colKeys].reverse();
@@ -1763,21 +1783,39 @@ self.addEventListener('fetch', e => {
                             const ns=byCol[col],N=ns.length;
                             const pull=N===1?0.55:N<=2?0.62:N<=4?0.38:N<=7?0.2:0.1;
                             ns.forEach(nd=>{
-                                const ys=[];
-                                edges.forEach(e=>{if(e.from===nd.id){const t=nodeMap[e.to];if(t&&t.col!==col){ys.push(t.y);ys.push(t.y);}}if(e.to===nd.id){const f=nodeMap[e.from];if(f&&f.col!==col)ys.push(f.y);}});
-                                if(ys.length){const tgt=ys.reduce((a,b)=>a+b,0)/ys.length;nd.y=nd.y*(1-pull)+tgt*pull;}
+                                const vs=[];
+                                edges.forEach(e=>{
+                                    if(e.from===nd.id){const t=nodeMap[e.to];if(t&&t.col!==col){vs.push(TB?t.x:t.y);vs.push(TB?t.x:t.y);}}
+                                    if(e.to===nd.id){const f=nodeMap[e.from];if(f&&f.col!==col)vs.push(TB?f.x:f.y);}
+                                });
+                                if(vs.length){
+                                    const tgt=vs.reduce((a,b)=>a+b,0)/vs.length;
+                                    if(TB)nd.x=nd.x*(1-pull)+tgt*pull;
+                                    else  nd.y=nd.y*(1-pull)+tgt*pull;
+                                }
                             });
                             if(N>1){
-                                ns.sort((a,b)=>a.y-b.y);
-                                for(let i=1;i<N;i++){if(ns[i].y-ns[i-1].y<NODE_H+10)ns[i].y=ns[i-1].y+NODE_H+10;}
-                                const mean=ns.reduce((s,n)=>s+n.y,0)/N;ns.forEach(nd=>{nd.y-=mean*0.15;});
+                                ns.sort((a,b)=>(TB?a.x-b.x:a.y-b.y));
+                                for(let i=1;i<N;i++){
+                                    const diff=TB?ns[i].x-ns[i-1].x:ns[i].y-ns[i-1].y;
+                                    if(diff<BASE_CROSS_GAP+10){
+                                        if(TB)ns[i].x=ns[i-1].x+BASE_CROSS_GAP+10;
+                                        else  ns[i].y=ns[i-1].y+BASE_CROSS_GAP+10;
+                                    }
+                                }
+                                const mean=ns.reduce((s,n)=>s+(TB?n.x:n.y),0)/N;
+                                ns.forEach(nd=>{if(TB)nd.x-=mean*0.15;else nd.y-=mean*0.15;});
                             }
                         });
                     }
                     colKeys.forEach(col=>{
                         const ns=byCol[col],N=ns.length,mb=colBulge[col],cx=colX[col];
-                        ns.sort((a,b)=>a.y-b.y);
-                        ns.forEach((nd,i)=>{const t=N>1?(i/(N-1))*2-1:0;nd.x=cx-mb*Math.sqrt(1-t*t);});
+                        ns.sort((a,b)=>(TB?a.x-b.x:a.y-b.y));
+                        ns.forEach((nd,i)=>{
+                            const t=N>1?(i/(N-1))*2-1:0;
+                            if(TB)nd.y=cx-mb*Math.sqrt(1-t*t);
+                            else  nd.x=cx-mb*Math.sqrt(1-t*t);
+                        });
                     });
                     groups=[];
                     colKeys.forEach(col=>{
@@ -1785,8 +1823,13 @@ self.addEventListener('fetch', e => {
                         ns.forEach(n=>{const s=n.schema||'_other';(bySchema[s]=bySchema[s]||[]).push(n);});
                         Object.entries(bySchema).forEach(([schema,gn])=>{
                             if(!schema||schema==='_other')return;
-                            const ys=gn.map(n=>n.y);
-                            groups.push({schema,type:gn[0].type,x:Math.min(...gn.map(n=>n.x))-10,y:Math.min(...ys)-8,w:NW+20+colBulge[col],h:Math.max(...ys)+NH+8-(Math.min(...ys)-8)+20,col});
+                            if(TB){
+                                const xs2=gn.map(n=>n.x);
+                                groups.push({schema,type:gn[0].type,x:Math.min(...xs2)-8,y:Math.min(...gn.map(n=>n.y))-10,w:Math.max(...xs2)+NW+8-(Math.min(...xs2)-8)+20,h:NH+20+colBulge[col],col});
+                            } else {
+                                const ys=gn.map(n=>n.y);
+                                groups.push({schema,type:gn[0].type,x:Math.min(...gn.map(n=>n.x))-10,y:Math.min(...ys)-8,w:NW+20+colBulge[col],h:Math.max(...ys)+NH+8-(Math.min(...ys)-8)+20,col});
+                            }
                         });
                     });
                 }
@@ -2046,7 +2089,7 @@ self.addEventListener('fetch', e => {
                         nodes=parsed.nodes; edges=parsed.edges;
                         nodeMap={}; nodes.forEach(n=>nodeMap[n.id]=n);
                         if(!nodes.length){setDfStatus({text:'No tables found. Check your SQL.',err:true,n:0,e:0});return;}
-                        assignLevels(nodes,edges); schemaGroupLayout();
+                        assignLevels(nodes,edges); schemaGroupLayout(_layoutDir);
                         nodeDefaults={}; nodes.forEach(n=>nodeDefaults[n.id]={x:n.x,y:n.y});
                         undoStack=[]; redoStack=[]; updUndoBtn();
                         hov=null; sel=null; selGroup.clear(); dragNode=null; // clear stale selection
@@ -2187,14 +2230,14 @@ self.addEventListener('fetch', e => {
                 const ro=new ResizeObserver(()=>{clearTimeout(_resizeT);_resizeT=setTimeout(()=>{resize();if(nodes.length)render();},_everFit?80:16);});
                 ro.observe(cwEl);
 
-                // ── Export PNG (offscreen, full diagram, 2× DPR) ──
+                // ── Export PNG (offscreen, full diagram, 3× DPR for crisp output) ──
                 function exportPNG(){
                     if(!nodes.length) return;
-                    const pad=48;
+                    const pad=64;
                     const mnx=Math.min(...nodes.map(n=>n.x-n.w/2)),mxx=Math.max(...nodes.map(n=>n.x+n.w/2));
                     const mny=Math.min(...nodes.map(n=>n.y-n.h/2)),mxy=Math.max(...nodes.map(n=>n.y+n.h/2));
                     const W=mxx-mnx+pad*2, H=mxy-mny+pad*2;
-                    const DPR=2;
+                    const DPR=3;
                     const off=document.createElement('canvas');
                     off.width=W*DPR; off.height=H*DPR;
                     const oc=off.getContext('2d');
@@ -2205,35 +2248,29 @@ self.addEventListener('fetch', e => {
                     oc.translate(-mnx+pad,-mny+pad);
                     // rounded rect helper
                     function _rc(x,y,w,h,r){oc.beginPath();oc.moveTo(x+r,y);oc.lineTo(x+w-r,y);oc.quadraticCurveTo(x+w,y,x+w,y+r);oc.lineTo(x+w,y+h-r);oc.quadraticCurveTo(x+w,y+h,x+w-r,y+h);oc.lineTo(x+r,y+h);oc.quadraticCurveTo(x,y+h,x,y+h-r);oc.lineTo(x,y+r);oc.quadraticCurveTo(x,y,x+r,y);oc.closePath();}
-                    // edges
+                    // shared helpers for edge drawing
+                    const ARROW_L=13,ARROW_W=6.5;
+                    const tang={right:{x:1,y:0},left:{x:-1,y:0},bottom:{x:0,y:1},top:{x:0,y:-1}};
+                    const tangDir={left:Math.PI,right:0,top:-Math.PI/2,bottom:Math.PI/2};
+                    function xport(node,side){const cx=node.x,cy=node.y,hw=node.w/2,hh=node.h/2;if(side==='right')return{x:cx+hw,y:cy};if(side==='left')return{x:cx-hw,y:cy};if(side==='bottom')return{x:cx,y:cy+hh};return{x:cx,y:cy-hh};}
+
+                    // pass 1 — edge LINES only (drawn behind nodes)
                     edges.forEach(e2=>{
                         const fn=nodeMap[e2.from],tn=nodeMap[e2.to]; if(!fn||!tn)return;
                         const {fromSide,toSide}=getBestPorts(fn,tn);
-                        function xport(node,side){const cx=node.x,cy=node.y,hw=node.w/2,hh=node.h/2;if(side==='right')return{x:cx+hw,y:cy};if(side==='left')return{x:cx-hw,y:cy};if(side==='bottom')return{x:cx,y:cy+hh};return{x:cx,y:cy-hh};}
                         const fp=xport(fn,fromSide),tp=xport(tn,toSide);
                         const dist=Math.sqrt((tp.x-fp.x)**2+(tp.y-fp.y)**2);
                         const bend=Math.min(Math.max(dist*0.42,40),200);
-                        const tang={right:{x:1,y:0},left:{x:-1,y:0},bottom:{x:0,y:1},top:{x:0,y:-1}};
                         const ft=tang[fromSide],tt=tang[toSide];
+                        const toDir2=tang[toSide];
+                        const tpStop={x:tp.x-toDir2.x*ARROW_L,y:tp.y-toDir2.y*ARROW_L};
                         oc.beginPath();oc.moveTo(fp.x,fp.y);
-                        oc.bezierCurveTo(fp.x+ft.x*bend,fp.y+ft.y*bend,tp.x+tt.x*bend,tp.y+tt.y*bend,tp.x,tp.y);
-                        oc.strokeStyle='#ccc8c3';oc.lineWidth=1.2;
-                        if(fn.type==='control'||tn.type==='control')oc.setLineDash([4,3]);
+                        oc.bezierCurveTo(fp.x+ft.x*bend,fp.y+ft.y*bend,tpStop.x+tt.x*bend,tpStop.y+tt.y*bend,tpStop.x,tpStop.y);
+                        oc.strokeStyle='#8a8480';oc.lineWidth=1.6;
+                        if(fn.type==='control'||tn.type==='control')oc.setLineDash([5,4]);
                         oc.stroke();oc.setLineDash([]);
-                        oc.beginPath();oc.arc(fp.x,fp.y,2.8,0,Math.PI*2);oc.fillStyle='#c2bdb8';oc.fill();
-                        const tangDir={left:Math.PI,right:0,top:-Math.PI/2,bottom:Math.PI/2};
-                        const ha=tangDir[toSide];
-                        const [r2,g2,b2]=h2rgb(TH[tn.type].border);
-                        oc.beginPath();oc.moveTo(tp.x,tp.y);oc.lineTo(tp.x-8*Math.cos(ha-.38),tp.y-8*Math.sin(ha-.38));oc.lineTo(tp.x-8*Math.cos(ha+.38),tp.y-8*Math.sin(ha+.38));oc.closePath();
-                        oc.fillStyle=`rgba(${r2},${g2},${b2},.3)`;oc.fill();
-                        if(e2.label){
-                            const mx2=(fp.x+tp.x)/2,my2=(fp.y+tp.y)/2-7;
-                            oc.font='600 9.5px Segoe UI,sans-serif';oc.textAlign='center';oc.textBaseline='middle';
-                            const tw=oc.measureText(e2.label).width+8,th3=14;
-                            oc.fillStyle='#f3f2f1';_rc(mx2-tw/2,my2-th3/2,tw,th3,2);oc.fill();
-                            oc.strokeStyle='#d4d0cc';oc.lineWidth=1;_rc(mx2-tw/2,my2-th3/2,tw,th3,2);oc.stroke();
-                            oc.fillStyle='#8a8a8a';oc.fillText(e2.label,mx2,my2);oc.textBaseline='alphabetic';
-                        }
+                        // origin dot
+                        oc.beginPath();oc.arc(fp.x,fp.y,3,0,Math.PI*2);oc.fillStyle='#8a8480';oc.fill();
                     });
                     // nodes
                     nodes.forEach(n=>{
@@ -2268,6 +2305,47 @@ self.addEventListener('fetch', e => {
                         oc.font='600 15px Segoe UI,sans-serif';oc.fillStyle='#1a1a1a';oc.textAlign='left';
                         nameLines.forEach(line=>{oc.fillText(line,textX,curY);curY+=LINE_H;});
                     });
+
+                    // pass 3 — arrowheads ON TOP of nodes (tips never hidden under node fill)
+                    edges.forEach(e2=>{
+                        const fn=nodeMap[e2.from],tn=nodeMap[e2.to]; if(!fn||!tn)return;
+                        const {fromSide,toSide}=getBestPorts(fn,tn);
+                        const fp=xport(fn,fromSide),tp=xport(tn,toSide);
+                        // Compute bezier control points to get true arrival angle (same as live canvas)
+                        const dist2=Math.sqrt((tp.x-fp.x)**2+(tp.y-fp.y)**2);
+                        const bend2=Math.min(Math.max(dist2*0.42,40),200);
+                        const ft2=tang[fromSide],tt2=tang[toSide];
+                        const cp2x=tp.x+tt2.x*bend2,cp2y=tp.y+tt2.y*bend2;
+                        const tdx=tp.x-cp2x,tdy=tp.y-cp2y;
+                        // Use true bezier tangent angle, fallback to straight line angle
+                        const ha=(Math.abs(tdx)<0.01&&Math.abs(tdy)<0.01)
+                            ? Math.atan2(tp.y-fp.y,tp.x-fp.x)
+                            : Math.atan2(tdy,tdx);
+                        const [r2,g2,b2]=h2rgb(TH[tn.type].border);
+                        const px2=Math.sin(ha)*ARROW_W,py2=-Math.cos(ha)*ARROW_W;
+                        oc.beginPath();
+                        oc.moveTo(tp.x,tp.y);
+                        oc.lineTo(tp.x-ARROW_L*Math.cos(ha)+px2,tp.y-ARROW_L*Math.sin(ha)+py2);
+                        oc.lineTo(tp.x-ARROW_L*Math.cos(ha)-px2,tp.y-ARROW_L*Math.sin(ha)-py2);
+                        oc.closePath();
+                        oc.fillStyle=`rgb(${r2},${g2},${b2})`;oc.fill();
+                        oc.strokeStyle=`rgba(${r2},${g2},${b2},0.5)`;oc.lineWidth=0.8;oc.stroke();
+                    });
+
+                    // pass 4 — edge labels (FROM / JOIN badges) on top of everything
+                    edges.forEach(e2=>{
+                        if(!e2.label)return;
+                        const fn=nodeMap[e2.from],tn=nodeMap[e2.to]; if(!fn||!tn)return;
+                        const {fromSide,toSide}=getBestPorts(fn,tn);
+                        const fp=xport(fn,fromSide),tp=xport(tn,toSide);
+                        const mx2=(fp.x+tp.x)/2,my2=(fp.y+tp.y)/2-7;
+                        oc.font='600 9.5px Segoe UI,sans-serif';oc.textAlign='center';oc.textBaseline='middle';
+                        const tw=oc.measureText(e2.label).width+8,th3=14;
+                        oc.fillStyle='#f3f2f1';_rc(mx2-tw/2,my2-th3/2,tw,th3,2);oc.fill();
+                        oc.strokeStyle='#d4d0cc';oc.lineWidth=1;_rc(mx2-tw/2,my2-th3/2,tw,th3,2);oc.stroke();
+                        oc.fillStyle='#8a8a8a';oc.fillText(e2.label,mx2,my2);oc.textBaseline='alphabetic';
+                    });
+
                     oc.restore();
                     off.toBlob(blob=>{
                         const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='data-flow.png';a.click();
@@ -2276,6 +2354,7 @@ self.addEventListener('fetch', e => {
                 }
 
                 // expose engine to React
+                let _layoutDir='LR'; // internal engine state
                 dfEngineRef.current={
                     parseAndRender,
                     clearCanvas,
@@ -2288,6 +2367,18 @@ self.addEventListener('fetch', e => {
                     exportPNG,
                     getNodeCount:()=>nodes.length,
                     getEdgeCount:()=>edges.length,
+                    setLayout(dir){
+                        _layoutDir=dir;
+                        if(nodes.length){
+                            assignLevels(nodes,edges);
+                            schemaGroupLayout(_layoutDir);
+                            nodeDefaults={};nodes.forEach(n=>nodeDefaults[n.id]={x:n.x,y:n.y});
+                            undoStack=[];redoStack=[];updUndoBtn();
+                            _everFit=false;
+                            if(cv.width>0&&cv.height>0){_everFit=true;fitView();}else render();
+                        }
+                    },
+                    getLayout:()=>_layoutDir,
                 };
 
                 resize();
@@ -2739,12 +2830,12 @@ self.addEventListener('fetch', e => {
                                                 ? <Activity className="h-3.5 w-3.5 animate-pulse" />
                                                 : activeTab === 'dataflow'
                                                     ? <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                                                        <circle cx="3" cy="8" r="1.5"/><circle cx="13" cy="3" r="1.5"/><circle cx="13" cy="13" r="1.5"/>
-                                                        <path d="M4.4 7.3L11.6 3.7M4.4 8.7L11.6 12.3"/>
+                                                        <rect x="1" y="6" width="4" height="4" rx="1"/><rect x="11" y="1.5" width="4" height="4" rx="1"/><rect x="11" y="10.5" width="4" height="4" rx="1"/>
+                                                        <path d="M5 8h3.5M8.5 8V3.5H11M8.5 8v4.5H11"/>
                                                       </svg>
                                                     : mode === 'beautify'
                                                         ? <Wand2 className="h-3.5 w-3.5" />
-                                                        : <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h12M4 8h8M6 12h4"/></svg>}
+                                                        : <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 2.5h14M1 5.5h10M1 8.5h12M7 11v2.5M5 12l2 2 2-2"/></svg>}
                                         </button>
                                     </Tooltip>
                                     <Tooltip content="Upload SQL file" position="bottom-right">
@@ -2824,7 +2915,7 @@ self.addEventListener('fetch', e => {
                                         <button onClick={()=>{ handleModeSwitch('minify'); setActiveTab('editor'); }}
                                             aria-label="Minify mode"
                                             className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-all">
-                                            <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h12M4 8h8M6 12h4"/></svg>
+                                            <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 2.5h14M1 5.5h10M1 8.5h12M7 11v2.5M5 12l2 2 2-2"/></svg>
                                             <span className="hidden sm:inline">Minify</span>
                                         </button>
                                     </Tooltip>
@@ -2839,16 +2930,37 @@ self.addEventListener('fetch', e => {
                                     <Tooltip content="Data Flow canvas" position="bottom-left">
                                         <button className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm transition-all">
                                             <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                                                <circle cx="3" cy="8" r="1.5"/>
-                                                <circle cx="13" cy="3" r="1.5"/>
-                                                <circle cx="13" cy="13" r="1.5"/>
-                                                <path d="M4.4 7.3L11.6 3.7M4.4 8.7L11.6 12.3"/>
+                                                <rect x="1" y="6" width="4" height="4" rx="1"/><rect x="11" y="1.5" width="4" height="4" rx="1"/><rect x="11" y="10.5" width="4" height="4" rx="1"/>
+                                                <path d="M5 8h3.5M8.5 8V3.5H11M8.5 8v4.5H11"/>
                                             </svg>
                                             <span className="hidden sm:inline">Data Flow</span>
                                         </button>
                                     </Tooltip>
                                 </div>
                                 <div className="ml-auto flex items-center gap-1 pr-1">
+                                    {/* Layout direction toggle */}
+                                    <Tooltip content={dfLayoutDir === 'LR' ? 'Switch to Top → Bottom layout' : 'Switch to Left → Right layout'} position="bottom-right">
+                                        <button
+                                            disabled={dfEmpty}
+                                            onClick={()=>{
+                                                const next = dfLayoutDir === 'LR' ? 'TB' : 'LR';
+                                                setDfLayoutDir(next);
+                                                dfEngineRef.current?.setLayout(next);
+                                            }}
+                                            className="flex items-center gap-1 h-7 px-2 rounded-md border text-xs font-semibold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 shadow-sm">
+                                            {dfLayoutDir === 'LR'
+                                                ? <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                                    <rect x="1" y="5" width="4" height="6" rx="1"/><rect x="11" y="5" width="4" height="6" rx="1"/>
+                                                    <path d="M5 8h6M9 6l2 2-2 2"/>
+                                                  </svg>
+                                                : <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                                    <rect x="5" y="1" width="6" height="4" rx="1"/><rect x="5" y="11" width="6" height="4" rx="1"/>
+                                                    <path d="M8 5v6M6 9l2 2 2-2"/>
+                                                  </svg>
+                                            }
+                                            <span className="hidden sm:inline">{dfLayoutDir === 'LR' ? 'Top→Bot' : 'Left→Right'}</span>
+                                        </button>
+                                    </Tooltip>
                                     <Tooltip content="Download diagram as PNG" position="bottom-right">
                                         <button onClick={()=>dfEngineRef.current?.exportPNG()} disabled={dfEmpty}
                                             className="flex items-center justify-center w-7 h-7 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 shadow-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed">
