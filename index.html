@@ -1865,7 +1865,9 @@ self.addEventListener('fetch', e => {
                     const sw=n.w*vp.scale,sh=n.h*vp.scale;
                     if(s.x+sw<0||s.x>cv.width||s.y+sh<0||s.y>cv.height)return;
                     const th=TH[n.type]||TH.source;
-                    const isHov=hov&&hov.id===n.id,isSel=sel&&sel.id===n.id,active=isHov||isSel;
+                    const isHov=hov&&hov.id===n.id,isSel=sel&&sel.id===n.id;
+                    const inChain=hovChain&&hovChain.has(n.id)&&!isHov;
+                    const active=isHov||isSel||inChain;
                     const [rb,gb,bb]=h2rgb(th.border);
                     // Shadow + background
                     ctx2d.save();ctx2d.shadowColor=active?`rgba(${rb},${gb},${bb},.22)`:'rgba(0,0,0,.09)';ctx2d.shadowBlur=active?16:6;ctx2d.shadowOffsetY=active?3:1.5;
@@ -1909,7 +1911,7 @@ self.addEventListener('fetch', e => {
                     ctx2d.fillText(tl,cx2,n.schema&&vp.scale>0.45?s.y+sh*0.72:s.y+sh*0.62);
                     // Selection ring
                     if(isSel){ctx2d.strokeStyle=th.border;ctx2d.lineWidth=2.5;rr(s.x-1.5,s.y-1.5,sw+3,sh+3,5);ctx2d.stroke();}
-                    // Hover port dot
+                    // Hover port dot — only on directly hovered node
                     if(isHov&&vp.scale>0.4){
                         ctx2d.beginPath();ctx2d.arc(s.x+sw,s.y+sh/2,5*vp.scale,0,Math.PI*2);ctx2d.fillStyle=th.border;ctx2d.fill();
                         ctx2d.beginPath();ctx2d.arc(s.x+sw,s.y+sh/2,3*vp.scale,0,Math.PI*2);ctx2d.fillStyle='#fff';ctx2d.fill();
@@ -1922,7 +1924,9 @@ self.addEventListener('fetch', e => {
                     const fsc=w2s(fn.x,fn.y),tsc=w2s(tn.x,tn.y);
                     const fp=getPort(fn,fromSide,tsc.x,tsc.y),tp=getPort(tn,toSide,fsc.x,fsc.y);
                     if(!isEdgeVisible(fp,tp))return;
-                    const active=(hov&&(hov.id===fn.id||hov.id===tn.id))||(sel&&(sel.id===fn.id||sel.id===tn.id));
+                    const inChain=hovChain&&hovChain.has(fn.id)&&hovChain.has(tn.id);
+                    const selActive=!hovChain&&sel&&(sel.id===fn.id||sel.id===tn.id);
+                    const active=inChain||selActive;
                     const th1=TH[fn.type],isCtrl=fn.type==='control'||tn.type==='control';
                     const arrowOff=active?11:9;
                     const toDir={left:{dx:-1,dy:0},right:{dx:1,dy:0},top:{dx:0,dy:-1},bottom:{dx:0,dy:1}}[toSide]||{dx:0,dy:0};
@@ -1946,7 +1950,9 @@ self.addEventListener('fetch', e => {
                     const fsc=w2s(fn.x,fn.y),tsc=w2s(tn.x,tn.y);
                     const fp=getPort(fn,fromSide,tsc.x,tsc.y),tp=getPort(tn,toSide,fsc.x,fsc.y);
                     if(!isEdgeVisible(fp,tp))return;
-                    const active=(hov&&(hov.id===fn.id||hov.id===tn.id))||(sel&&(sel.id===fn.id||sel.id===tn.id));
+                    const inChain=hovChain&&hovChain.has(fn.id)&&hovChain.has(tn.id);
+                    const selActive=!hovChain&&sel&&(sel.id===fn.id||sel.id===tn.id);
+                    const active=inChain||selActive;
                     const{cp1x,cp1y,cp2x,cp2y}=getBezier(fp,tp,fromSide,toSide);
                     const tdx=tp.x-cp2x,tdy=tp.y-cp2y;
                     const ang=Math.abs(tdx)<0.01&&Math.abs(tdy)<0.01?Math.atan2(tp.y-fp.y,tp.x-fp.x):Math.atan2(tdy,tdx);
@@ -2518,8 +2524,8 @@ self.addEventListener('fetch', e => {
                 const bgKey1 = otherMode === 'beautify' ? 'beautify' : `minify:${autoAlias}:${removeNL}`;
                 bgJobRef.current = { key: bgKey1, text: sql };
                 getBgWorker().postMessage({ text: sql, mode: otherMode, autoAlias, removeNL });
-                // Always sync data flow if it has been rendered before OR if currently on dataflow tab
-                if (dfEngineRef.current && (dfLastRenderedRef.current || activeTab === 'dataflow')) {
+                // Always sync data flow diagram whenever SQL is processed, regardless of active tab
+                if (dfEngineRef.current) {
                     dfLastRenderedRef.current = sql;
                     dfEngineRef.current.parseAndRender(sql);
                 }
