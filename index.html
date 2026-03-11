@@ -24,24 +24,13 @@
     <meta name="twitter:title" content="SQL Canvas | Workspace" />
     <meta name="twitter:description" content="Minify, beautify and visualise SQL data flow in your browser." />
 
-    <!-- Dark mode: apply class synchronously before first paint to prevent flash -->
+    <!-- Dark mode: default to light mode; preference is held in-memory for the session only -->
     <script>
         (function () {
-            try {
-                var stored = localStorage.getItem('sqlcanvas-dark');
-                // 'sqlcanvas-dark-v2' is a new key — old browsers with stale '1' will
-                // never match it, so they cleanly get light mode on first load after deploy.
-                // Only honour dark if the user explicitly set it in THIS version.
-                var v2 = localStorage.getItem('sqlcanvas-dark-v2');
-                if (v2 === '1') {
-                    document.documentElement.classList.add('dark');
-                } else {
-                    document.documentElement.classList.remove('dark');
-                    if (v2 === null) localStorage.setItem('sqlcanvas-dark-v2', '0');
-                }
-                // Clean up the old stale key so it doesn't cause confusion
-                if (stored !== null) localStorage.removeItem('sqlcanvas-dark');
-            } catch (_) {}
+            // No localStorage — dark mode is session-only (resets to light on page reload).
+            // window.__sqlcanvasDark is the single source of truth read by React on mount.
+            window.__sqlcanvasDark = false;
+            document.documentElement.classList.remove('dark');
         })();
     </script>
 
@@ -1392,7 +1381,8 @@ self.addEventListener('fetch', e => {
             const [autoAlias,    setAutoAlias]    = useState(true);
             const [removeNL,     setRemoveNL]     = useState(false);
             const [isDark,       setIsDark]       = useState(() => {
-                try { return localStorage.getItem('sqlcanvas-dark-v2') === '1'; } catch(_) { return false; }
+                // No localStorage — read the in-memory flag set by the pre-paint script
+                return window.__sqlcanvasDark === true;
             });
             const [error,        setError]        = useState(null);
             const [splitPct,     setSplitPct]     = useState(50);
@@ -1465,7 +1455,11 @@ self.addEventListener('fetch', e => {
                 }
                 function showTip(node,clientX,clientY){
                     const tip=ensureTip();
-                    const fullName=node.schema?node.schema+'.'+node.label.replace(/\n/g,'').trim():node.label.replace(/\n/g,'').trim();
+                    // node.label is stored as "schema\n.tablename" — extract only the table part
+                    // before prepending node.schema, to avoid "target.target.tablename" duplicates
+                    const rawLabel=node.label.replace(/\n/g,'').trim();
+                    const labelTable=rawLabel.includes('.')?rawLabel.split('.').pop():rawLabel;
+                    const fullName=node.schema?node.schema+'.'+labelTable:rawLabel;
                     tip.textContent=fullName;
                     tip.style.display='block';
                     tip.style.opacity='1';
@@ -2405,10 +2399,10 @@ self.addEventListener('fetch', e => {
                 return () => cancelAnimationFrame(frame);
             }, []); // mount once — engine persists across tab switches
 
-            // Apply dark mode class to <html>
+            // Apply dark mode class to <html> and keep in-memory flag in sync
             useEffect(() => {
                 document.documentElement.classList.toggle('dark', isDark);
-                try { localStorage.setItem('sqlcanvas-dark-v2', isDark ? '1' : '0'); } catch(_) {}
+                window.__sqlcanvasDark = isDark; // session-only; no localStorage
             }, [isDark]);
 
             // Keep activeTabRef in sync so non-reactive callbacks (runAllTabs etc.) can read it
@@ -2835,7 +2829,7 @@ self.addEventListener('fetch', e => {
                                                       </svg>
                                                     : mode === 'beautify'
                                                         ? <Wand2 className="h-3.5 w-3.5" />
-                                                        : <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 2.5h14M1 5.5h10M1 8.5h12M7 11v2.5M5 12l2 2 2-2"/></svg>}
+                                                        : <Play className="h-3.5 w-3.5" />}
                                         </button>
                                     </Tooltip>
                                     <Tooltip content="Upload SQL file" position="bottom-right">
@@ -2915,7 +2909,7 @@ self.addEventListener('fetch', e => {
                                         <button onClick={()=>{ handleModeSwitch('minify'); setActiveTab('editor'); }}
                                             aria-label="Minify mode"
                                             className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-all">
-                                            <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 2.5h14M1 5.5h10M1 8.5h12M7 11v2.5M5 12l2 2 2-2"/></svg>
+                                            <Play className="h-3 w-3 shrink-0"/>
                                             <span className="hidden sm:inline">Minify</span>
                                         </button>
                                     </Tooltip>
@@ -3056,7 +3050,10 @@ self.addEventListener('fetch', e => {
                                     };
                                     const {node:n, ins, outs} = dfNodeDetail;
                                     const th = TH_COLORS[n.type] || TH_COLORS.source;
-                                    const displayName = n.label.replace(/\n/g, '.').trim();
+                                    const rawDisplayLabel=n.label.replace(/\n/g,'').trim();
+                                    const displayName=n.schema
+                                        ?n.schema+'.'+(rawDisplayLabel.includes('.')?rawDisplayLabel.split('.').pop():rawDisplayLabel)
+                                        :rawDisplayLabel;
                                     return (
                                         <div style={{
                                             position:'absolute',top:10,right:12,width:240,
@@ -3174,7 +3171,7 @@ self.addEventListener('fetch', e => {
                                                         ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
                                                         : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                                                 }`}>
-                                                <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h12M4 8h8M6 12h4"/></svg>
+                                                <Play className="h-3 w-3 shrink-0"/>
                                                 <span className="hidden sm:inline">Minify</span>
                                             </button>
                                         </Tooltip>
@@ -3199,10 +3196,8 @@ self.addEventListener('fetch', e => {
                                                         : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                                                 }`}>
                                                 <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                                                    <circle cx="3" cy="8" r="1.5"/>
-                                                    <circle cx="13" cy="3" r="1.5"/>
-                                                    <circle cx="13" cy="13" r="1.5"/>
-                                                    <path d="M4.4 7.3L11.6 3.7M4.4 8.7L11.6 12.3"/>
+                                                    <rect x="1" y="6" width="4" height="4" rx="1"/><rect x="11" y="1.5" width="4" height="4" rx="1"/><rect x="11" y="10.5" width="4" height="4" rx="1"/>
+                                                    <path d="M5 8h3.5M8.5 8V3.5H11M8.5 8v4.5H11"/>
                                                 </svg>
                                                 <span className="hidden sm:inline">Data Flow</span>
                                             </button>
