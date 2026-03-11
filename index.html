@@ -2370,23 +2370,10 @@ self.addEventListener('fetch', e => {
                     setLayout(dir){
                         _layoutDir=dir;
                         if(nodes.length){
-                            // Capture how much each node was manually displaced from its default position
-                            const offsets={};
-                            nodes.forEach(n=>{
-                                const def=nodeDefaults[n.id];
-                                if(def) offsets[n.id]={dx:n.x-def.x, dy:n.y-def.y};
-                            });
-                            // Recompute layout (gives new default positions)
                             assignLevels(nodes,edges);
                             schemaGroupLayout(_layoutDir);
-                            // Update nodeDefaults to new layout positions
                             nodeDefaults={};nodes.forEach(n=>nodeDefaults[n.id]={x:n.x,y:n.y});
-                            // Reapply user's manual offsets on top of new layout positions
-                            nodes.forEach(n=>{
-                                const off=offsets[n.id];
-                                if(off){n.x+=off.dx;n.y+=off.dy;}
-                            });
-                            // Keep undo/redo history intact — user's moves are still valid
+                            undoStack=[];redoStack=[];updUndoBtn();
                             _everFit=false;
                             if(cv.width>0&&cv.height>0){_everFit=true;fitView();}else render();
                         }
@@ -2842,16 +2829,13 @@ self.addEventListener('fetch', e => {
                                             {isProcessing
                                                 ? <Activity className="h-3.5 w-3.5 animate-pulse" />
                                                 : activeTab === 'dataflow'
-                                                    /* Data Flow: network/DAG icon */
                                                     ? <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                                                         <rect x="1" y="6" width="4" height="4" rx="1"/><rect x="11" y="1.5" width="4" height="4" rx="1"/><rect x="11" y="10.5" width="4" height="4" rx="1"/>
                                                         <path d="M5 8h3.5M8.5 8V3.5H11M8.5 8v4.5H11"/>
                                                       </svg>
                                                     : mode === 'beautify'
-                                                        /* Beautify: wand/sparkle stays */
                                                         ? <Wand2 className="h-3.5 w-3.5" />
-                                                        /* Minify: play triangle */
-                                                        : <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5l9 5.5-9 5.5z"/></svg>}
+                                                        : <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 2.5h14M1 5.5h10M1 8.5h12M7 11v2.5M5 12l2 2 2-2"/></svg>}
                                         </button>
                                     </Tooltip>
                                     <Tooltip content="Upload SQL file" position="bottom-right">
